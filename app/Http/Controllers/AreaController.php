@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
+use Illuminate\Http\JsonResponse;
 
 class AreaController extends Controller
 {
@@ -144,5 +145,84 @@ class AreaController extends Controller
     {
         $value = trim((string) $value);
         return $value !== '' ? $value : null;
+    }
+    public function filtrar(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'buscar' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'estado' => [
+                'nullable',
+                Rule::in([
+                    'Activo',
+                    'Inactivo',
+                ]),
+            ],
+            'page' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+        ]);
+
+        $buscar = trim((string) ($datos['buscar'] ?? ''));
+        $estado = $datos['estado'] ?? null;
+        $pagina = (int) ($datos['page'] ?? 1);
+
+        return response()->json([
+            'areas' => $this->obtenerAreas(
+                buscar: $buscar,
+                estado: $estado,
+                pagina: $pagina
+            ),
+            'filtros' => [
+                'buscar' => $buscar,
+                'estado' => $estado ?? '',
+            ],
+        ]);
+    }
+
+     private function obtenerAreas(string $buscar = '',?string $estado = null,int $pagina = 1)
+     {
+        return Area::query()
+            ->withCount([
+                'personal',
+                'usuarios',
+            ])
+            ->when(
+                $buscar !== '',
+                fn ($query) => $query->where(
+                    function ($subquery) use ($buscar) {
+                        $subquery
+                            ->where(
+                                'nombre',
+                                'like',
+                                "%{$buscar}%"
+                            )
+                            ->orWhere(
+                                'descripcion',
+                                'like',
+                                "%{$buscar}%"
+                            );
+                    }
+                )
+            )
+            ->when(
+                $estado !== null && $estado !== '',
+                fn ($query) => $query->where(
+                    'estado',
+                    $estado
+                )
+            )
+            ->orderBy('nombre')
+            ->paginate(
+                perPage: 15,
+                columns: ['*'],
+                pageName: 'page',
+                page: $pagina
+            );
     }
 }

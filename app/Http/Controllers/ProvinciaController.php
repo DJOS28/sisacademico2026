@@ -13,32 +13,54 @@ use Inertia\Response;
 
 class ProvinciaController extends Controller
 {
-    public function index(Request $request): Response
+    /**
+     * Muestra el listado inicial de provincias.
+     */
+    public function index(): Response
     {
-        $buscar = trim((string) $request->input('buscar', ''));
-        $idDepa = $request->input('idDepa');
+        return Inertia::render('Provincias/Index', [
+            'provincias' => $this->obtenerProvincias(),
+            'departamentos' => $this->departamentos(),
+            'filtros' => [
+                'buscar' => '',
+                'idDepa' => '',
+            ],
+        ]);
+    }
 
-        $provincias = Provincia::query()
-            ->with('departamento')
-            ->withCount('distritos')
-            ->when(
-                $buscar !== '',
-                fn ($query) => $query->where(
-                    'Provincia',
-                    'like',
-                    "%{$buscar}%"
-                )
-            )
-            ->when(
-                filled($idDepa),
-                fn ($query) => $query->where('idDepa', $idDepa)
-            )
-            ->orderBy('Provincia')
-            ->paginate(15)
-            ->withQueryString();
+    /**
+     * Filtra las provincias mediante una petición AJAX de Inertia.
+     */
+    public function filtrar(Request $request): Response
+    {
+        $datos = $request->validate([
+            'buscar' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'idDepa' => [
+                'nullable',
+                'integer',
+                'exists:departamentos,idDepa',
+            ],
+            'page' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+        ]);
+
+        $buscar = trim((string) ($datos['buscar'] ?? ''));
+        $idDepa = $datos['idDepa'] ?? null;
+        $pagina = (int) ($datos['page'] ?? 1);
 
         return Inertia::render('Provincias/Index', [
-            'provincias' => $provincias,
+            'provincias' => $this->obtenerProvincias(
+                buscar: $buscar,
+                idDepa: $idDepa,
+                pagina: $pagina
+            ),
             'departamentos' => $this->departamentos(),
             'filtros' => [
                 'buscar' => $buscar,
@@ -47,6 +69,9 @@ class ProvinciaController extends Controller
         ]);
     }
 
+    /**
+     * Muestra el formulario de registro.
+     */
     public function create(): Response
     {
         return Inertia::render('Provincias/Create', [
@@ -54,6 +79,9 @@ class ProvinciaController extends Controller
         ]);
     }
 
+    /**
+     * Registra una nueva provincia.
+     */
     public function store(Request $request): RedirectResponse
     {
         $datos = $this->validar($request);
@@ -64,9 +92,15 @@ class ProvinciaController extends Controller
         ]);
 
         return to_route('provincias.index')
-            ->with('success', 'Provincia registrada correctamente.');
+            ->with(
+                'success',
+                'Provincia registrada correctamente.'
+            );
     }
 
+    /**
+     * Muestra el formulario de edición.
+     */
     public function edit(Provincia $provincia): Response
     {
         return Inertia::render('Provincias/Edit', [
@@ -75,6 +109,9 @@ class ProvinciaController extends Controller
         ]);
     }
 
+    /**
+     * Actualiza una provincia.
+     */
     public function update(
         Request $request,
         Provincia $provincia
@@ -87,11 +124,18 @@ class ProvinciaController extends Controller
         ]);
 
         return to_route('provincias.index')
-            ->with('success', 'Provincia actualizada correctamente.');
+            ->with(
+                'success',
+                'Provincia actualizada correctamente.'
+            );
     }
 
-    public function destroy(Provincia $provincia): RedirectResponse
-    {
+    /**
+     * Elimina una provincia.
+     */
+    public function destroy(
+        Provincia $provincia
+    ): RedirectResponse {
         if ($provincia->distritos()->exists()) {
             return back()->with(
                 'error',
@@ -107,11 +151,15 @@ class ProvinciaController extends Controller
         );
     }
 
+    /**
+     * Retorna las provincias que pertenecen a un departamento.
+     */
     public function porDepartamento(
         Departamento $departamento
     ): JsonResponse {
         return response()->json([
-            'provincias' => $departamento->provincias()
+            'provincias' => $departamento
+                ->provincias()
                 ->orderBy('Provincia')
                 ->get([
                     'idProv',
@@ -120,6 +168,46 @@ class ProvinciaController extends Controller
         ]);
     }
 
+    /**
+     * Construye la consulta de provincias.
+     */
+    private function obtenerProvincias(
+        string $buscar = '',
+        ?int $idDepa = null,
+        int $pagina = 1
+    ) {
+        return Provincia::query()
+            ->with([
+                'departamento:idDepa,Departamento',
+            ])
+            ->withCount('distritos')
+            ->when(
+                $buscar !== '',
+                fn ($query) => $query->where(
+                    'Provincia',
+                    'like',
+                    "%{$buscar}%"
+                )
+            )
+            ->when(
+                $idDepa !== null,
+                fn ($query) => $query->where(
+                    'idDepa',
+                    $idDepa
+                )
+            )
+            ->orderBy('Provincia')
+            ->paginate(
+                perPage: 15,
+                columns: ['*'],
+                pageName: 'page',
+                page: $pagina
+            );
+    }
+
+    /**
+     * Valida los datos de registro y actualización.
+     */
     private function validar(
         Request $request,
         ?Provincia $provincia = null
@@ -129,14 +217,20 @@ class ProvinciaController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('provincias', 'Provincia')
+                Rule::unique(
+                    'provincias',
+                    'Provincia'
+                )
                     ->where(
                         fn ($query) => $query->where(
                             'idDepa',
                             $request->input('idDepa')
                         )
                     )
-                    ->ignore($provincia?->idProv, 'idProv'),
+                    ->ignore(
+                        $provincia?->idProv,
+                        'idProv'
+                    ),
             ],
             'idDepa' => [
                 'required',
@@ -146,6 +240,9 @@ class ProvinciaController extends Controller
         ]);
     }
 
+    /**
+     * Obtiene los departamentos disponibles.
+     */
     private function departamentos()
     {
         return Departamento::query()
@@ -156,3 +253,4 @@ class ProvinciaController extends Controller
             ]);
     }
 }
+

@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import Form from './Form';
 
 export default function Create({
+    planesEstudio,
     semestres,
     modulos,
     tipos,
@@ -14,6 +15,7 @@ export default function Create({
         processing,
         errors,
     } = useForm({
+        plan_estudio_id: '',
         nombre: '',
         descripcion: '',
         semestre_id: '',
@@ -31,24 +33,13 @@ export default function Create({
     };
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        Nuevo curso
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500">
-                        Registre un curso dentro de la estructura académica.
-                    </p>
-                </div>
-            }
-        >
+        <AuthenticatedLayout>
             <Head title="Nuevo curso" />
 
             <div className="mb-4">
                 <Link
                     href={route('cursos.index')}
-                    className="text-sm font-semibold text-[#315d7a] hover:underline"
+                    className="text-sm font-semibold text-[#315d7a]"
                 >
                     ← Volver al listado
                 </Link>
@@ -64,6 +55,7 @@ export default function Create({
                         setData,
                         errors,
                         processing,
+                        planesEstudio,
                         semestres,
                         modulos,
                         tipos,

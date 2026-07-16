@@ -174,12 +174,21 @@ const adminNavigation = [
             },
             
             {
-                label: 'Pabellones y aulas',
+                label: 'Pabellones',
+                routeName: 'pabellones.index',
+            },
+            
+            {
+                label: 'Aulas',
                 routeName: 'aulas.index',
             },
             {
-                label: 'Turnos y secciones',
+                label: 'Turnos',
                 routeName: 'turnos.index',
+            },
+            {
+                label: 'Secciones',
+                routeName: 'secciones.index',
             },
         ],
     },

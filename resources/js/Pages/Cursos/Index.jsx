@@ -1,32 +1,62 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import Swal from 'sweetalert2';
-import { useEffect, useState } from 'react';
+import axios from 'axios';
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import ImportModal from './ImportModal';
 
 export default function Index({
-    cursos,
+    cursos: cursosIniciales,
+    planesEstudio = [],
     semestres,
     modulos,
     tipos,
-    filtros,
 }) {
     const { flash } = usePage().props;
 
+    const [cursos, setCursos] =
+        useState(cursosIniciales);
+
     const [buscar, setBuscar] =
-        useState(filtros.buscar ?? '');
+        useState('');
+
+    const [planEstudioId, setPlanEstudioId] =
+        useState('');
 
     const [semestreId, setSemestreId] =
-        useState(filtros.semestre_id ?? '');
+        useState('');
 
     const [moduloId, setModuloId] =
-        useState(filtros.id_modulo ?? '');
+        useState('');
 
     const [tipo, setTipo] =
-        useState(filtros.tipo ?? '');
+        useState('');
 
     const [importOpen, setImportOpen] =
         useState(false);
+
+    const [cargando, setCargando] =
+        useState(false);
+
+    const primeraCarga = useRef(true);
+    const abortControllerRef = useRef(null);
+
+    const modulosFiltrados = useMemo(() => {
+        if (!planEstudioId) {
+            return modulos;
+        }
+
+        return modulos.filter(
+            (modulo) =>
+                String(modulo.id_plan_estudio) ===
+                String(planEstudioId)
+        );
+    }, [modulos, planEstudioId]);
 
     useEffect(() => {
         if (flash?.success) {
@@ -44,42 +74,102 @@ export default function Index({
                 text: flash.error,
             });
         }
-
-        if (flash?.import_errors?.length) {
-            const detalle = flash.import_errors
-                .map(
-                    (item) =>
-                        `Fila ${item.fila}: ${item.mensaje.join(
-                            ' '
-                        )}`
-                )
-                .join('<br>');
-
-            Swal.fire({
-                icon: 'warning',
-                title: 'Filas omitidas',
-                html: `<div style="text-align:left;max-height:300px;overflow:auto">${detalle}</div>`,
-                width: 760,
-            });
-        }
     }, [flash]);
 
-    const buscarCursos = (event) => {
-        event.preventDefault();
+    const filtrarCursos = async (page = 1) => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
 
-        router.get(
-            route('cursos.index'),
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setCargando(true);
+
+    try {
+        const response = await axios.post(
+            route('cursos.filtrar'),
             {
-                buscar,
-                semestre_id: semestreId,
-                id_modulo: moduloId,
-                tipo,
+                buscar: buscar.trim() || null,
+                plan_estudio_id:
+                    planEstudioId || null,
+                semestre_id:
+                    semestreId || null,
+                id_modulo:
+                    moduloId || null,
+                tipo: tipo || null,
+                page,
             },
             {
-                preserveState: true,
-                replace: true,
+                signal: controller.signal,
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With':
+                        'XMLHttpRequest',
+                },
             }
         );
+
+        setCursos(response.data.cursos);
+    } catch (error) {
+        if (
+            error.name === 'CanceledError' ||
+            error.code === 'ERR_CANCELED'
+        ) {
+            return;
+        }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al filtrar',
+            text:
+                error.response?.data?.message ||
+                'No se pudieron cargar los cursos.',
+        });
+    } finally {
+        if (
+            abortControllerRef.current ===
+            controller
+        ) {
+            setCargando(false);
+        }
+    }
+};
+
+    useEffect(() => {
+        if (primeraCarga.current) {
+            primeraCarga.current = false;
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            filtrarCursos(1);
+        }, 350);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [
+        buscar,
+        planEstudioId,
+        semestreId,
+        moduloId,
+        tipo,
+    ]);
+
+    const cambiarPlan = (event) => {
+        const value = event.target.value;
+
+        setPlanEstudioId(value);
+        setModuloId('');
+    };
+
+    const limpiarFiltros = () => {
+        setBuscar('');
+        setPlanEstudioId('');
+        setSemestreId('');
+        setModuloId('');
+        setTipo('');
     };
 
     const eliminar = async (curso) => {
@@ -101,6 +191,10 @@ export default function Index({
             route('cursos.destroy', curso.id),
             {
                 preserveScroll: true,
+                onSuccess: () =>
+                    filtrarCursos(
+                        cursos.current_page ?? 1
+                    ),
             }
         );
     };
@@ -115,7 +209,7 @@ export default function Index({
                         </h1>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            Gestión e importación masiva de cursos.
+                            Filtros automáticos sin modificar la URL.
                         </p>
                     </div>
 
@@ -142,10 +236,7 @@ export default function Index({
         >
             <Head title="Cursos" />
 
-            <form
-                onSubmit={buscarCursos}
-                className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5"
-            >
+            <div className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-6">
                 <input
                     type="search"
                     value={buscar}
@@ -157,9 +248,30 @@ export default function Index({
                 />
 
                 <select
+                    value={planEstudioId}
+                    onChange={cambiarPlan}
+                    className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                >
+                    <option value="">
+                        Todos los planes
+                    </option>
+
+                    {planesEstudio.map((plan) => (
+                        <option
+                            key={plan.id}
+                            value={plan.id}
+                        >
+                            {plan.nombre}
+                        </option>
+                    ))}
+                </select>
+
+                <select
                     value={semestreId}
                     onChange={(event) =>
-                        setSemestreId(event.target.value)
+                        setSemestreId(
+                            event.target.value
+                        )
                     }
                     className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 >
@@ -180,7 +292,9 @@ export default function Index({
                 <select
                     value={moduloId}
                     onChange={(event) =>
-                        setModuloId(event.target.value)
+                        setModuloId(
+                            event.target.value
+                        )
                     }
                     className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 >
@@ -188,7 +302,7 @@ export default function Index({
                         Todos los módulos
                     </option>
 
-                    {modulos.map((modulo) => (
+                    {modulosFiltrados.map((modulo) => (
                         <option
                             key={modulo.id_modulo}
                             value={modulo.id_modulo}
@@ -211,40 +325,45 @@ export default function Index({
                     </option>
 
                     {tipos.map((item) => (
-                        <option key={item} value={item}>
+                        <option
+                            key={item}
+                            value={item}
+                        >
                             {item}
                         </option>
                     ))}
                 </select>
 
-                <div className="flex gap-3 md:col-span-5">
-                    <button
-                        type="submit"
-                        className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-                    >
-                        Buscar
-                    </button>
-
+                <div className="flex items-center gap-3 md:col-span-6">
                     <button
                         type="button"
-                        onClick={() =>
-                            router.get(
-                                route('cursos.index')
-                            )
-                        }
+                        onClick={limpiarFiltros}
                         className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600"
                     >
-                        Limpiar
+                        Limpiar filtros
                     </button>
-                </div>
-            </form>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    {cargando && (
+                        <span className="text-sm font-medium text-[#315d7a]">
+                            Cargando resultados...
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div
+                className={[
+                    'overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm transition',
+                    cargando
+                        ? 'pointer-events-none opacity-60'
+                        : '',
+                ].join(' ')}
+            >
                 <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                         <tr>
                             {[
-                                'Orden',
+                                'Plan de estudio',
                                 'Curso',
                                 'Semestre',
                                 'Módulo',
@@ -269,14 +388,30 @@ export default function Index({
                                 key={curso.id}
                                 className="hover:bg-slate-50"
                             >
-                                <td className="px-4 py-3 text-sm text-slate-600">
-                                    {curso.orden}
+                                <td className="px-4 py-3">
+                                    {curso.planes_estudio?.length >
+                                    0 ? (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {curso.planes_estudio.map(
+                                                (plan) => (
+                                                    <span
+                                                        key={plan.id}
+                                                        className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"
+                                                    >
+                                                        {plan.nombre}
+                                                    </span>
+                                                )
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm text-slate-400">
+                                            Sin plan
+                                        </span>
+                                    )}
                                 </td>
 
-                                <td className="px-4 py-3">
-                                    <p className="text-sm font-semibold text-slate-900">
-                                        {curso.nombre}
-                                    </p>
+                                <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                                    {curso.nombre}
                                 </td>
 
                                 <td className="px-4 py-3 text-sm text-slate-600">
@@ -349,12 +484,17 @@ export default function Index({
                     <button
                         key={index}
                         type="button"
-                        disabled={!link.url}
+                        disabled={!link.url || cargando}
                         onClick={() =>
-                            link.url &&
-                            router.visit(link.url, {
-                                preserveState: true,
-                            })
+                            filtrarCursos(
+                                Number(
+                                    new URL(
+                                        link.url
+                                    ).searchParams.get(
+                                        'page'
+                                    ) || 1
+                                )
+                            )
                         }
                         className={[
                             'rounded-md border px-3 py-2 text-sm',

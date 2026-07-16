@@ -4,8 +4,8 @@ namespace App\Imports;
 
 use App\Models\Curso;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -16,9 +16,7 @@ class CursoImport implements
     SkipsEmptyRows
 {
     private int $importados = 0;
-
     private int $omitidos = 0;
-
     private array $errores = [];
 
     public function collection(Collection $rows): void
@@ -31,70 +29,70 @@ class CursoImport implements
                 'descripcion' => $this->nullable(
                     $row['descripcion'] ?? null
                 ),
-                'semestre_id' => $row['semestre_id'] ?? null,
+                'plan_estudio_id' =>
+                    $row['plan_estudio_id'] ?? null,
+                'semestre_id' =>
+                    $row['semestre_id'] ?? null,
                 'tipo' => $this->nullable(
                     $row['tipo'] ?? null
                 ),
-                'id_modulo' => $row['id_modulo'] ?? null,
-                'creditos' => $row['creditos'] ?? null,
+                'id_modulo' =>
+                    $row['id_modulo'] ?? null,
+                'creditos' =>
+                    $row['creditos'] ?? null,
                 'horas_semestrales' =>
                     $row['horas_semestrales'] ?? null,
-                'orden' => $row['orden'] ?? null,
+                'orden' =>
+                    $row['orden'] ?? null,
             ];
 
-            $validator = Validator::make(
-                $datos,
-                [
-                    'nombre' => [
-                        'required',
-                        'string',
-                        'max:100',
-                    ],
-                    'descripcion' => [
-                        'nullable',
-                        'string',
-                    ],
-                    'semestre_id' => [
-                        'required',
-                        'integer',
-                        'exists:semestres,id',
-                    ],
-                    'tipo' => [
-                        'required',
-                        'string',
-                        'max:20',
-                    ],
-                    'id_modulo' => [
-                        'required',
-                        'integer',
-                        'exists:modulos_formativos,id_modulo',
-                    ],
-                    'creditos' => [
-                        'required',
-                        'numeric',
-                        'min:0',
-                        'max:99.99',
-                    ],
-                    'horas_semestrales' => [
-                        'required',
-                        'integer',
-                        'min:1',
-                        'max:10000',
-                    ],
-                    'orden' => [
-                        'required',
-                        'integer',
-                        'min:1',
-                        'max:1000',
-                    ],
+            $validator = Validator::make($datos, [
+                'nombre' => [
+                    'required',
+                    'string',
+                    'max:100',
                 ],
-                [],
-                [
-                    'semestre_id' => 'semestre',
-                    'id_modulo' => 'módulo formativo',
-                    'horas_semestrales' => 'horas semestrales',
-                ]
-            );
+                'descripcion' => [
+                    'nullable',
+                    'string',
+                ],
+                'plan_estudio_id' => [
+                    'required',
+                    'integer',
+                    'exists:planes_estudio,id',
+                ],
+                'semestre_id' => [
+                    'required',
+                    'integer',
+                    'exists:semestres,id',
+                ],
+                'tipo' => [
+                    'required',
+                    'string',
+                    'max:20',
+                ],
+                'id_modulo' => [
+                    'required',
+                    'integer',
+                    'exists:modulos_formativos,id_modulo',
+                ],
+                'creditos' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                    'max:99.99',
+                ],
+                'horas_semestrales' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
+                'orden' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
+            ]);
 
             if ($validator->fails()) {
                 $this->errores[] = [
@@ -103,9 +101,31 @@ class CursoImport implements
                         ->errors()
                         ->all(),
                 ];
-
                 $this->omitidos++;
+                continue;
+            }
 
+            $moduloPerteneceAlPlan = DB::table(
+                'modulos_formativos'
+            )
+                ->where(
+                    'id_modulo',
+                    $datos['id_modulo']
+                )
+                ->where(
+                    'id_plan_estudio',
+                    $datos['plan_estudio_id']
+                )
+                ->exists();
+
+            if (! $moduloPerteneceAlPlan) {
+                $this->errores[] = [
+                    'fila' => $numeroFila,
+                    'mensaje' => [
+                        'El módulo indicado no pertenece al plan de estudio seleccionado.',
+                    ],
+                ];
+                $this->omitidos++;
                 continue;
             }
 
@@ -113,37 +133,51 @@ class CursoImport implements
                 ->where('nombre', $datos['nombre'])
                 ->where('semestre_id', $datos['semestre_id'])
                 ->where('id_modulo', $datos['id_modulo'])
+                ->whereHas(
+                    'planesEstudio',
+                    fn ($query) => $query->where(
+                        'planes_estudio.id',
+                        $datos['plan_estudio_id']
+                    )
+                )
                 ->exists();
 
             if ($duplicado) {
                 $this->errores[] = [
                     'fila' => $numeroFila,
                     'mensaje' => [
-                        'El curso ya existe para el semestre y módulo indicados.',
+                        'El curso ya existe para el plan, semestre y módulo indicados.',
                     ],
                 ];
-
                 $this->omitidos++;
-
                 continue;
             }
 
-            Curso::create([
-                'nombre' => $datos['nombre'],
-                'descripcion' => $datos['descripcion'],
-                'semestre_id' => (int) $datos['semestre_id'],
-                'tipo' => $datos['tipo'],
-                'id_modulo' => (int) $datos['id_modulo'],
-                'creditos' => number_format(
-                    (float) $datos['creditos'],
-                    2,
-                    '.',
-                    ''
-                ),
-                'horas_semestrales' =>
-                    (int) $datos['horas_semestrales'],
-                'orden' => (int) $datos['orden'],
-            ]);
+            DB::transaction(function () use ($datos): void {
+                $curso = Curso::create([
+                    'nombre' => $datos['nombre'],
+                    'descripcion' => $datos['descripcion'],
+                    'semestre_id' =>
+                        (int) $datos['semestre_id'],
+                    'tipo' => $datos['tipo'],
+                    'id_modulo' =>
+                        (int) $datos['id_modulo'],
+                    'creditos' => number_format(
+                        (float) $datos['creditos'],
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'horas_semestrales' =>
+                        (int) $datos['horas_semestrales'],
+                    'orden' =>
+                        (int) $datos['orden'],
+                ]);
+
+                $curso->planesEstudio()->attach(
+                    (int) $datos['plan_estudio_id']
+                );
+            });
 
             $this->importados++;
         }

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\JsonResponse;
 use Throwable;
 
 class ModuloFormativoController extends Controller
@@ -45,7 +46,7 @@ class ModuloFormativoController extends Controller
             )
             ->when(
                 filled($planEstudioId),
-                fn ($query) => $query->where(
+                fn($query) => $query->where(
                     'id_plan_estudio',
                     $planEstudioId
                 )
@@ -55,8 +56,8 @@ class ModuloFormativoController extends Controller
             ->paginate(10)
             ->withQueryString()
             ->through(
-                fn (ModuloFormativo $modulo): array =>
-                    $this->moduloData($modulo)
+                fn(ModuloFormativo $modulo): array =>
+                $this->moduloData($modulo)
             );
 
         $planesEstudio = PlanEstudio::query()
@@ -68,7 +69,7 @@ class ModuloFormativoController extends Controller
                 'activo',
             ])
             ->map(
-                fn (PlanEstudio $plan): array => [
+                fn(PlanEstudio $plan): array => [
                     'id' => $plan->id,
                     'nombre' => $plan->nombre,
                     'codigo' => $plan->codigo,
@@ -105,7 +106,7 @@ class ModuloFormativoController extends Controller
             'nombre' => trim($datos['nombre']),
             'num_modulo' => (int) $datos['num_modulo'],
             'horas' => (int) $datos['horas'],
-            'creditos' =>$datos['creditos'],
+            'creditos' => $datos['creditos'],
         ]);
 
         return to_route('modulos-formativos.index')
@@ -204,7 +205,7 @@ class ModuloFormativoController extends Controller
                     'num_modulo'
                 )
                     ->where(
-                        fn ($query) => $query->where(
+                        fn($query) => $query->where(
                             'id_plan_estudio',
                             $planEstudioId
                         )
@@ -229,27 +230,27 @@ class ModuloFormativoController extends Controller
             ],
         ], [
             'id_plan_estudio.required' =>
-                'Debe seleccionar un plan de estudio.',
+            'Debe seleccionar un plan de estudio.',
             'id_plan_estudio.exists' =>
-                'El plan de estudio seleccionado no existe.',
+            'El plan de estudio seleccionado no existe.',
             'nombre.required' =>
-                'El nombre del módulo es obligatorio.',
+            'El nombre del módulo es obligatorio.',
             'nombre.max' =>
-                'El nombre no debe superar los 100 caracteres.',
+            'El nombre no debe superar los 100 caracteres.',
             'num_modulo.required' =>
-                'El número de módulo es obligatorio.',
+            'El número de módulo es obligatorio.',
             'num_modulo.min' =>
-                'El número de módulo debe ser mayor que cero.',
+            'El número de módulo debe ser mayor que cero.',
             'num_modulo.unique' =>
-                'Ya existe ese número de módulo dentro del plan seleccionado.',
+            'Ya existe ese número de módulo dentro del plan seleccionado.',
             'horas.required' =>
-                'La cantidad de horas es obligatoria.',
+            'La cantidad de horas es obligatoria.',
             'horas.min' =>
-                'La cantidad de horas debe ser mayor que cero.',
+            'La cantidad de horas debe ser mayor que cero.',
             'creditos.required' =>
-                'La cantidad de créditos es obligatoria.',
+            'La cantidad de créditos es obligatoria.',
             'creditos.min' =>
-                'La cantidad de créditos debe ser mayor que cero.',
+            'La cantidad de créditos debe ser mayor que cero.',
         ]);
     }
 
@@ -298,7 +299,7 @@ class ModuloFormativoController extends Controller
                 'activo',
             ])
             ->map(
-                fn (PlanEstudio $plan): array => [
+                fn(PlanEstudio $plan): array => [
                     'id' => $plan->id,
                     'nombre' => $plan->nombre,
                     'codigo' => $plan->codigo,
@@ -307,5 +308,138 @@ class ModuloFormativoController extends Controller
             )
             ->values()
             ->all();
+    }
+
+    public function filtrar(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'buscar' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'plan_estudio_id' => [
+                'nullable',
+                'integer',
+                'exists:planes_estudio,id',
+            ],
+            'page' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+        ], [
+            'buscar.max' =>
+            'La búsqueda no debe superar los 100 caracteres.',
+            'plan_estudio_id.exists' =>
+            'El plan de estudio seleccionado no existe.',
+        ]);
+
+        $buscar = trim(
+            (string) ($datos['buscar'] ?? '')
+        );
+
+        $planEstudioId =
+            $datos['plan_estudio_id'] ?? null;
+
+        $pagina = (int) ($datos['page'] ?? 1);
+
+        $modulos = ModuloFormativo::query()
+            ->with([
+                'planEstudio:id,nombre,codigo,activo',
+            ])
+            ->when(
+                $buscar !== '',
+                function ($query) use ($buscar): void {
+                    $query->where(
+                        function ($subquery) use ($buscar): void {
+                            $subquery
+                                ->where(
+                                    'nombre',
+                                    'like',
+                                    "%{$buscar}%"
+                                )
+                                ->orWhere(
+                                    'num_modulo',
+                                    'like',
+                                    "%{$buscar}%"
+                                )
+                                ->orWhere(
+                                    'horas',
+                                    'like',
+                                    "%{$buscar}%"
+                                )
+                                ->orWhere(
+                                    'creditos',
+                                    'like',
+                                    "%{$buscar}%"
+                                )
+                                ->orWhereHas(
+                                    'planEstudio',
+                                    function ($planQuery) use (
+                                        $buscar
+                                    ): void {
+                                        $planQuery
+                                            ->where(
+                                                'nombre',
+                                                'like',
+                                                "%{$buscar}%"
+                                            )
+                                            ->orWhere(
+                                                'codigo',
+                                                'like',
+                                                "%{$buscar}%"
+                                            );
+                                    }
+                                );
+                        }
+                    );
+                }
+            )
+            ->when(
+                $planEstudioId,
+                fn($query) => $query->where(
+                    'id_plan_estudio',
+                    $planEstudioId
+                )
+            )
+            ->orderBy('id_plan_estudio')
+            ->orderBy('num_modulo')
+            ->paginate(
+                10,
+                ['*'],
+                'page',
+                $pagina
+            );
+
+        $modulos->getCollection()->transform(
+            fn(ModuloFormativo $modulo): array => [
+                'id_modulo' => $modulo->id_modulo,
+                'id_plan_estudio' =>
+                $modulo->id_plan_estudio,
+                'nombre' => $modulo->nombre,
+                'num_modulo' => $modulo->num_modulo,
+                'horas' => $modulo->horas,
+                'creditos' => $modulo->creditos,
+
+                'plan_estudio' => $modulo->planEstudio
+                    ? [
+                        'id' => $modulo->planEstudio->id,
+                        'nombre' =>
+                        $modulo->planEstudio->nombre,
+                        'codigo' =>
+                        $modulo->planEstudio->codigo,
+                        'activo' =>
+                        (bool) $modulo
+                            ->planEstudio
+                            ->activo,
+                    ]
+                    : null,
+            ]
+        );
+
+        return response()->json([
+            'modulos' => $modulos,
+        ]);
     }
 }

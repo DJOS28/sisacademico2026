@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Curso extends Model
 {
@@ -48,6 +49,16 @@ class Curso extends Model
             ModuloFormativo::class,
             'id_modulo',
             'id_modulo'
+        );
+    }
+
+    public function planesEstudio(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            PlanEstudio::class,
+            'cursos_plan_estudio',
+            'curso_id',
+            'plan_estudio_id'
         );
     }
 }

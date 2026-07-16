@@ -11,26 +11,31 @@ use Inertia\Response;
 
 class DepartamentoController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(): Response
     {
-        $buscar = trim((string) $request->input('buscar', ''));
+        return Inertia::render('Departamentos/Index', [
+            'departamentos' => $this->obtenerDepartamentos(),
+            'filtros' => [
+                'buscar' => '',
+            ],
+        ]);
+    }
 
-        $departamentos = Departamento::query()
-            ->withCount('provincias')
-            ->when(
-                $buscar !== '',
-                fn ($query) => $query->where(
-                    'Departamento',
-                    'like',
-                    "%{$buscar}%"
-                )
-            )
-            ->orderBy('Departamento')
-            ->paginate(15)
-            ->withQueryString();
+    public function filtrar(Request $request): Response
+    {
+        $datos = $request->validate([
+            'buscar' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $buscar = trim((string) ($datos['buscar'] ?? ''));
+        $pagina = (int) ($datos['page'] ?? 1);
 
         return Inertia::render('Departamentos/Index', [
-            'departamentos' => $departamentos,
+            'departamentos' => $this->obtenerDepartamentos(
+                buscar: $buscar,
+                pagina: $pagina
+            ),
             'filtros' => [
                 'buscar' => $buscar,
             ],
@@ -106,5 +111,28 @@ class DepartamentoController extends Controller
             'success',
             'Departamento eliminado correctamente.'
         );
+    }
+
+    private function obtenerDepartamentos(
+        string $buscar = '',
+        int $pagina = 1
+    ) {
+        return Departamento::query()
+            ->withCount('provincias')
+            ->when(
+                $buscar !== '',
+                fn ($query) => $query->where(
+                    'Departamento',
+                    'like',
+                    "%{$buscar}%"
+                )
+            )
+            ->orderBy('Departamento')
+            ->paginate(
+                perPage: 15,
+                columns: ['*'],
+                pageName: 'page',
+                page: $pagina
+            );
     }
 }

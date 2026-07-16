@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlanEstudio extends Model
 {
@@ -24,6 +25,8 @@ class PlanEstudio extends Model
         return [
             'activo' => 'boolean',
             'moodle_category_id' => 'integer',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 
@@ -35,5 +38,24 @@ class PlanEstudio extends Model
             'plan_estudio_id',
             'periodo_id'
         )->withTimestamps();
+    }
+
+    public function modulosFormativos(): HasMany
+    {
+        return $this->hasMany(
+            ModuloFormativo::class,
+            'id_plan_estudio',
+            'id'
+        );
+    }
+
+    public function cursos(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Curso::class,
+            'cursos_plan_estudio',
+            'plan_estudio_id',
+            'curso_id'
+        );
     }
 }

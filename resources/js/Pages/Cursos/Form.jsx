@@ -1,10 +1,12 @@
 import InputError from '@/Components/InputError';
+import { useMemo } from 'react';
 
 export default function Form({
     data,
     setData,
     errors,
     processing,
+    planesEstudio,
     semestres,
     modulos,
     tipos,
@@ -13,26 +15,60 @@ export default function Form({
     const inputClass =
         'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[#315d7a] focus:ring-4 focus:ring-[#dfeaf1]';
 
+    const modulosFiltrados = useMemo(() => {
+        if (!data.plan_estudio_id) {
+            return [];
+        }
+
+        return modulos.filter(
+            (modulo) =>
+                String(modulo.id_plan_estudio) ===
+                String(data.plan_estudio_id)
+        );
+    }, [modulos, data.plan_estudio_id]);
+
+    const cambiarPlan = (event) => {
+        const nuevoPlanId = event.target.value;
+
+        setData((actual) => ({
+            ...actual,
+            plan_estudio_id: nuevoPlanId,
+            id_modulo: '',
+        }));
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
+                <div>
                     <label className="mb-2 block text-sm font-semibold text-slate-700">
-                        Nombre del curso
+                        Plan de estudio
                     </label>
 
-                    <input
-                        type="text"
-                        value={data.nombre}
-                        onChange={(event) =>
-                            setData('nombre', event.target.value)
-                        }
+                    <select
+                        value={data.plan_estudio_id}
+                        onChange={cambiarPlan}
                         className={inputClass}
-                        maxLength={100}
-                    />
+                    >
+                        <option value="">
+                            Seleccione un plan
+                        </option>
+
+                        {planesEstudio.map((plan) => (
+                            <option
+                                key={plan.id}
+                                value={plan.id}
+                            >
+                                {plan.nombre}
+                                {plan.codigo
+                                    ? ` (${plan.codigo})`
+                                    : ''}
+                            </option>
+                        ))}
+                    </select>
 
                     <InputError
-                        message={errors.nombre}
+                        message={errors.plan_estudio_id}
                         className="mt-2"
                     />
                 </div>
@@ -62,44 +98,12 @@ export default function Form({
                                 value={semestre.id}
                             >
                                 {semestre.nombre}
-                                {!semestre.activo
-                                    ? ' - Inactivo'
-                                    : ''}
                             </option>
                         ))}
                     </select>
 
                     <InputError
                         message={errors.semestre_id}
-                        className="mt-2"
-                    />
-                </div>
-
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                        Tipo
-                    </label>
-
-                    <select
-                        value={data.tipo}
-                        onChange={(event) =>
-                            setData('tipo', event.target.value)
-                        }
-                        className={inputClass}
-                    >
-                        <option value="">
-                            Seleccione un tipo
-                        </option>
-
-                        {tipos.map((tipo) => (
-                            <option key={tipo} value={tipo}>
-                                {tipo}
-                            </option>
-                        ))}
-                    </select>
-
-                    <InputError
-                        message={errors.tipo}
                         className="mt-2"
                     />
                 </div>
@@ -118,26 +122,82 @@ export default function Form({
                             )
                         }
                         className={inputClass}
+                        disabled={!data.plan_estudio_id}
                     >
                         <option value="">
-                            Seleccione un módulo
+                            {data.plan_estudio_id
+                                ? 'Seleccione un módulo'
+                                : 'Primero seleccione un plan'}
                         </option>
 
-                        {modulos.map((modulo) => (
+                        {modulosFiltrados.map((modulo) => (
                             <option
                                 key={modulo.id_modulo}
                                 value={modulo.id_modulo}
                             >
-                                {modulo.plan_estudio?.nombre ||
-                                    'Sin plan'}{' '}
-                                — Módulo {modulo.num_modulo}:{' '}
-                                {modulo.nombre}
+                                Módulo {modulo.num_modulo}: {modulo.nombre}
                             </option>
                         ))}
                     </select>
 
                     <InputError
                         message={errors.id_modulo}
+                        className="mt-2"
+                    />
+                </div>
+
+                <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Nombre del curso
+                    </label>
+
+                    <input
+                        type="text"
+                        value={data.nombre}
+                        onChange={(event) =>
+                            setData(
+                                'nombre',
+                                event.target.value
+                            )
+                        }
+                        className={inputClass}
+                        maxLength={100}
+                    />
+
+                    <InputError
+                        message={errors.nombre}
+                        className="mt-2"
+                    />
+                </div>
+
+                <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tipo
+                    </label>
+
+                    <select
+                        value={data.tipo}
+                        onChange={(event) =>
+                            setData(
+                                'tipo',
+                                event.target.value
+                            )
+                        }
+                        className={inputClass}
+                    >
+                        <option value="">
+                            Seleccione un tipo
+                        </option>
+
+                        {tipos.map((tipo) => (
+                            <option key={tipo} value={tipo}>
+                                {tipo}
+                            </option>
+                        ))}
+                    </select>
+
+                    <InputError
+                        message={errors.tipo}
                         className="mt-2"
                     />
                 </div>
@@ -160,7 +220,6 @@ export default function Form({
                             )
                         }
                         className={inputClass}
-                        placeholder="Ejemplo: 3.50"
                     />
 
                     <InputError
@@ -203,7 +262,10 @@ export default function Form({
                         min="1"
                         value={data.orden}
                         onChange={(event) =>
-                            setData('orden', event.target.value)
+                            setData(
+                                'orden',
+                                event.target.value
+                            )
                         }
                         className={inputClass}
                     />
@@ -228,7 +290,6 @@ export default function Form({
                             )
                         }
                         className={`${inputClass} min-h-28 resize-y`}
-                        maxLength={3000}
                     />
 
                     <InputError
@@ -242,7 +303,7 @@ export default function Form({
                 <button
                     type="submit"
                     disabled={processing}
-                    className="rounded-lg bg-[#315d7a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#274c64] disabled:opacity-60"
+                    className="rounded-lg bg-[#315d7a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                     {processing
                         ? 'Guardando...'

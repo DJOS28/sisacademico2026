@@ -1,94 +1,153 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useEffect, useRef, useState } from 'react';
 
 export default function Index({
-    provincias,
-    departamentos,
+    pabellones: pabellonesIniciales,
     filtros = {},
 }) {
-    const [buscar, setBuscar] = useState(filtros.buscar ?? '');
-    const [idDepa, setIdDepa] = useState(filtros.idDepa ?? '');
+    const { flash } = usePage().props;
+
+    const [pabellones, setPabellones] = useState(
+        pabellonesIniciales
+    );
+
+    const [buscar, setBuscar] = useState(
+        filtros.buscar ?? ''
+    );
+
     const [cargando, setCargando] = useState(false);
 
     const primeraCarga = useRef(true);
+    const controladorFiltro = useRef(null);
 
-    const filtrar = (
+    useEffect(() => {
+        setPabellones(pabellonesIniciales);
+    }, [pabellonesIniciales]);
+
+    useEffect(() => {
+        if (flash?.success) {
+            Swal.fire({
+                title: 'Correcto',
+                text: flash.success,
+                icon: 'success',
+                confirmButtonText: 'Aceptar',
+            });
+        }
+
+        if (flash?.error) {
+            Swal.fire({
+                title: 'Atención',
+                text: flash.error,
+                icon: 'error',
+                confirmButtonText: 'Aceptar',
+            });
+        }
+    }, [flash]);
+
+    const filtrar = async (
         termino = buscar,
-        departamento = idDepa,
         pagina = 1,
         mantenerScroll = true
     ) => {
+        controladorFiltro.current?.abort();
+        controladorFiltro.current = new AbortController();
+
         setCargando(true);
 
-        router.post(
-            route('provincias.filtrar'),
-            {
-                buscar: termino.trim(),
-                idDepa: departamento || null,
-                page: pagina,
-            },
-            {
-                preserveState: true,
-                preserveScroll: mantenerScroll,
-                replace: true,
-                only: ['provincias', 'filtros'],
-
-                onError: () => {
-                    Swal.fire({
-                        title: 'Error',
-                        text: 'No se pudo realizar la búsqueda.',
-                        icon: 'error',
-                        confirmButtonText: 'Aceptar',
-                    });
+        try {
+            const response = await axios.post(
+                route('pabellones.filtrar'),
+                {
+                    buscar: termino.trim(),
+                    page: pagina,
                 },
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    signal: controladorFiltro.current.signal,
+                }
+            );
 
-                onFinish: () => {
-                    setCargando(false);
-                },
+            setPabellones(response.data.pabellones);
+
+            if (!mantenerScroll) {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth',
+                });
             }
-        );
+        } catch (error) {
+            if (
+                error.code === 'ERR_CANCELED' ||
+                error.name === 'CanceledError'
+            ) {
+                return;
+            }
+
+            let mensaje =
+                'No se pudo realizar la búsqueda de pabellones.';
+
+            if (error.response?.status === 422) {
+                const errores = error.response.data?.errors;
+
+                mensaje =
+                    errores?.buscar?.[0] ??
+                    errores?.page?.[0] ??
+                    mensaje;
+            }
+
+            Swal.fire({
+                title: 'Error',
+                text: mensaje,
+                icon: 'error',
+                confirmButtonText: 'Aceptar',
+            });
+        } finally {
+            setCargando(false);
+        }
     };
 
-    /**
-     * Ejecuta automáticamente el filtro cuando cambia
-     * el texto o el departamento seleccionado.
-     */
     useEffect(() => {
         if (primeraCarga.current) {
             primeraCarga.current = false;
             return;
         }
 
-        const temporizador = setTimeout(() => {
-            filtrar(buscar, idDepa, 1);
+        const temporizador = window.setTimeout(() => {
+            filtrar(buscar, 1);
         }, 400);
 
-        return () => clearTimeout(temporizador);
-    }, [buscar, idDepa]);
+        return () => {
+            window.clearTimeout(temporizador);
+        };
+    }, [buscar]);
+
+    const limpiarFiltro = () => {
+        setBuscar('');
+    };
 
     const cambiarPagina = (pagina) => {
         if (
             pagina < 1 ||
-            pagina > provincias.last_page ||
-            pagina === provincias.current_page
+            pagina > pabellones.last_page ||
+            pagina === pabellones.current_page ||
+            cargando
         ) {
             return;
         }
 
-        filtrar(buscar, idDepa, pagina, false);
+        filtrar(buscar, pagina, false);
     };
 
-    const limpiarFiltros = () => {
-        setBuscar('');
-        setIdDepa('');
-    };
-
-    const eliminar = async (item) => {
-        const result = await Swal.fire({
-            title: '¿Eliminar provincia?',
-            text: item.Provincia,
+    const eliminar = async (pabellon) => {
+        const resultado = await Swal.fire({
+            title: '¿Eliminar pabellón?',
+            text: pabellon.nombre,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc2626',
@@ -98,57 +157,102 @@ export default function Index({
             reverseButtons: true,
         });
 
-        if (!result.isConfirmed) {
+        if (!resultado.isConfirmed) {
             return;
         }
 
         router.delete(
-            route('provincias.destroy', item.idProv),
+            route('pabellones.destroy', pabellon.id),
             {
                 preserveScroll: true,
 
-                onSuccess: () => {
+                onStart: () => {
                     Swal.fire({
-                        title: 'Provincia eliminada',
-                        text: 'La provincia fue eliminada correctamente.',
+                        title: 'Eliminando...',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => Swal.showLoading(),
+                    });
+                },
+
+                onSuccess: async (page) => {
+                    const mensaje =
+                        page.props?.flash?.success ??
+                        'El pabellón fue eliminado correctamente.';
+
+                    await Swal.fire({
+                        title: 'Pabellón eliminado',
+                        text: mensaje,
                         icon: 'success',
-                        timer: 1800,
+                        timer: 1700,
                         showConfirmButton: false,
                     });
+
+                    const paginaObjetivo =
+                        pabellones.data.length === 1 &&
+                        pabellones.current_page > 1
+                            ? pabellones.current_page - 1
+                            : pabellones.current_page;
+
+                    filtrar(
+                        buscar,
+                        paginaObjetivo,
+                        true
+                    );
                 },
 
                 onError: (errors) => {
                     Swal.fire({
                         title: 'No se pudo eliminar',
                         text:
-                            errors?.provincia ??
+                            errors?.pabellon ??
                             errors?.error ??
-                            'La provincia puede tener distritos relacionados.',
+                            'El pabellón puede tener aulas relacionadas.',
                         icon: 'error',
                         confirmButtonText: 'Aceptar',
                     });
+                },
+
+                onFinish: () => {
+                    if (Swal.isLoading()) {
+                        Swal.close();
+                    }
                 },
             }
         );
     };
 
     const obtenerPaginas = () => {
-        const paginaActual = provincias.current_page;
-        const ultimaPagina = provincias.last_page;
+        const paginaActual = pabellones.current_page;
+        const ultimaPagina = pabellones.last_page;
         const paginas = [];
 
-        let inicio = Math.max(1, paginaActual - 2);
-        let fin = Math.min(ultimaPagina, paginaActual + 2);
+        let inicio = Math.max(
+            1,
+            paginaActual - 2
+        );
+
+        let fin = Math.min(
+            ultimaPagina,
+            paginaActual + 2
+        );
 
         if (paginaActual <= 3) {
             fin = Math.min(5, ultimaPagina);
         }
 
         if (paginaActual >= ultimaPagina - 2) {
-            inicio = Math.max(1, ultimaPagina - 4);
+            inicio = Math.max(
+                1,
+                ultimaPagina - 4
+            );
         }
 
-        for (let pagina = inicio; pagina <= fin; pagina++) {
+        for (
+            let pagina = inicio;
+            pagina <= fin;
+            pagina += 1
+        ) {
             paginas.push(pagina);
         }
 
@@ -161,136 +265,87 @@ export default function Index({
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
-                            Provincias
+                            Pabellones
                         </h1>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            Mantenimiento de provincias.
+                            Mantenimiento de pabellones institucionales.
                         </p>
                     </div>
 
                     <Link
-                        href={route('provincias.create')}
+                        href={route('pabellones.create')}
                         className="rounded-lg bg-[#315d7a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#274b63]"
                     >
-                        Nueva provincia
+                        Nuevo pabellón
                     </Link>
                 </div>
             }
         >
-            <Head title="Provincias" />
+            <Head title="Pabellones" />
 
-            {/* Filtros automáticos */}
             <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-4 lg:flex-row">
-                    <div className="min-w-0 flex-1">
-                        <label
-                            htmlFor="buscar"
-                            className="mb-2 block text-sm font-semibold text-slate-700"
-                        >
-                            Buscar provincia
-                        </label>
+                <label
+                    htmlFor="buscar"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                >
+                    Buscar pabellón
+                </label>
 
-                        <div className="relative">
-                            <input
-                                id="buscar"
-                                type="search"
-                                value={buscar}
-                                onChange={(event) =>
-                                    setBuscar(event.target.value)
-                                }
-                                placeholder="Escriba el nombre de la provincia..."
-                                autoComplete="off"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-20 text-sm text-slate-800 outline-none transition focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                <div className="relative">
+                    <input
+                        id="buscar"
+                        type="search"
+                        value={buscar}
+                        onChange={(event) =>
+                            setBuscar(event.target.value)
+                        }
+                        placeholder="Buscar por nombre o descripción..."
+                        autoComplete="off"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-20 text-sm text-slate-800 outline-none transition focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                    />
+
+                    <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                        {cargando && (
+                            <span
+                                className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#315d7a]"
+                                aria-label="Buscando"
                             />
+                        )}
 
-                            <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                                {cargando && (
-                                    <span
-                                        className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#315d7a]"
-                                        aria-label="Buscando"
-                                    />
-                                )}
-
-                                {buscar !== '' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setBuscar('')}
-                                        className="flex h-6 w-6 items-center justify-center rounded-full text-lg font-bold text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                                        aria-label="Limpiar búsqueda"
-                                    >
-                                        ×
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="w-full lg:w-80">
-                        <label
-                            htmlFor="idDepa"
-                            className="mb-2 block text-sm font-semibold text-slate-700"
-                        >
-                            Departamento
-                        </label>
-
-                        <select
-                            id="idDepa"
-                            value={idDepa}
-                            onChange={(event) =>
-                                setIdDepa(event.target.value)
-                            }
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
-                        >
-                            <option value="">
-                                Todos los departamentos
-                            </option>
-
-                            {departamentos.map((item) => (
-                                <option
-                                    key={item.idDepa}
-                                    value={item.idDepa}
-                                >
-                                    {item.Departamento}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {(buscar !== '' || idDepa !== '') && (
-                        <div className="flex items-end">
+                        {buscar !== '' && (
                             <button
                                 type="button"
-                                onClick={limpiarFiltros}
-                                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 lg:w-auto"
+                                onClick={limpiarFiltro}
+                                className="flex h-6 w-6 items-center justify-center rounded-full text-lg font-bold text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Limpiar búsqueda"
                             >
-                                Limpiar filtros
+                                ×
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-slate-500">
                     Los resultados se actualizan automáticamente.
                 </p>
             </div>
 
-            {/* Tabla */}
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    Provincia
+                                    Pabellón
                                 </th>
 
                                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    Departamento
+                                    Descripción
                                 </th>
 
                                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    Distritos
+                                    Aulas
                                 </th>
 
                                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -300,24 +355,24 @@ export default function Index({
                         </thead>
 
                         <tbody className="divide-y divide-slate-100">
-                            {provincias.data.length > 0 ? (
-                                provincias.data.map((item) => (
+                            {pabellones.data.length > 0 ? (
+                                pabellones.data.map((pabellon) => (
                                     <tr
-                                        key={item.idProv}
+                                        key={pabellon.id}
                                         className="transition hover:bg-slate-50"
                                     >
                                         <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                                            {item.Provincia}
+                                            {pabellon.nombre}
                                         </td>
 
-                                        <td className="px-4 py-3 text-sm text-slate-600">
-                                            {item.departamento
-                                                ?.Departamento ?? '—'}
+                                        <td className="max-w-lg px-4 py-3 text-sm text-slate-600">
+                                            {pabellon.descripcion ||
+                                                'Sin descripción'}
                                         </td>
 
-                                        <td className="px-4 py-3 text-sm text-slate-600">
+                                        <td className="px-4 py-3">
                                             <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                                {item.distritos_count ?? 0}
+                                                {pabellon.aulas_count ?? 0}
                                             </span>
                                         </td>
 
@@ -325,8 +380,8 @@ export default function Index({
                                             <div className="flex flex-wrap gap-2">
                                                 <Link
                                                     href={route(
-                                                        'provincias.edit',
-                                                        item.idProv
+                                                        'pabellones.edit',
+                                                        pabellon.id
                                                     )}
                                                     className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                                                 >
@@ -336,7 +391,7 @@ export default function Index({
                                                 <button
                                                     type="button"
                                                     onClick={() =>
-                                                        eliminar(item)
+                                                        eliminar(pabellon)
                                                     }
                                                     className="rounded-md border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
                                                 >
@@ -353,22 +408,20 @@ export default function Index({
                                         className="px-4 py-12 text-center"
                                     >
                                         <p className="text-sm font-semibold text-slate-600">
-                                            No se encontraron provincias.
+                                            No se encontraron pabellones.
                                         </p>
 
                                         <p className="mt-1 text-xs text-slate-400">
-                                            Pruebe con otros criterios de
-                                            búsqueda.
+                                            Pruebe con otro término de búsqueda.
                                         </p>
 
-                                        {(buscar !== '' ||
-                                            idDepa !== '') && (
+                                        {buscar !== '' && (
                                             <button
                                                 type="button"
-                                                onClick={limpiarFiltros}
+                                                onClick={limpiarFiltro}
                                                 className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                                             >
-                                                Limpiar filtros
+                                                Limpiar búsqueda
                                             </button>
                                         )}
                                     </td>
@@ -378,36 +431,35 @@ export default function Index({
                     </table>
                 </div>
 
-                {/* Paginación AJAX */}
-                {provincias.total > 0 && (
+                {pabellones.total > 0 && (
                     <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-slate-500">
                             Mostrando{' '}
                             <span className="font-semibold text-slate-700">
-                                {provincias.from}
+                                {pabellones.from}
                             </span>{' '}
                             a{' '}
                             <span className="font-semibold text-slate-700">
-                                {provincias.to}
+                                {pabellones.to}
                             </span>{' '}
                             de{' '}
                             <span className="font-semibold text-slate-700">
-                                {provincias.total}
+                                {pabellones.total}
                             </span>{' '}
                             registros
                         </p>
 
-                        {provincias.last_page > 1 && (
+                        {pabellones.last_page > 1 && (
                             <div className="flex flex-wrap items-center gap-1">
                                 <button
                                     type="button"
                                     onClick={() =>
                                         cambiarPagina(
-                                            provincias.current_page - 1
+                                            pabellones.current_page - 1
                                         )
                                     }
                                     disabled={
-                                        provincias.current_page === 1 ||
+                                        pabellones.current_page === 1 ||
                                         cargando
                                     }
                                     className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -425,7 +477,7 @@ export default function Index({
                                         disabled={cargando}
                                         className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold transition ${
                                             pagina ===
-                                            provincias.current_page
+                                            pabellones.current_page
                                                 ? 'bg-[#315d7a] text-white'
                                                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
                                         }`}
@@ -438,12 +490,12 @@ export default function Index({
                                     type="button"
                                     onClick={() =>
                                         cambiarPagina(
-                                            provincias.current_page + 1
+                                            pabellones.current_page + 1
                                         )
                                     }
                                     disabled={
-                                        provincias.current_page ===
-                                            provincias.last_page ||
+                                        pabellones.current_page ===
+                                            pabellones.last_page ||
                                         cargando
                                     }
                                     className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"

@@ -4,6 +4,7 @@ import Form from './Form';
 
 export default function Edit({
     curso,
+    planesEstudio,
     semestres,
     modulos,
     tipos,
@@ -15,6 +16,8 @@ export default function Edit({
         processing,
         errors,
     } = useForm({
+        plan_estudio_id:
+            curso.plan_estudio_id ?? '',
         nombre: curso.nombre ?? '',
         descripcion: curso.descripcion ?? '',
         semestre_id: curso.semestre_id ?? '',
@@ -33,24 +36,13 @@ export default function Edit({
     };
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        Editar curso
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500">
-                        Actualice la información académica del curso.
-                    </p>
-                </div>
-            }
-        >
+        <AuthenticatedLayout>
             <Head title="Editar curso" />
 
             <div className="mb-4">
                 <Link
                     href={route('cursos.index')}
-                    className="text-sm font-semibold text-[#315d7a] hover:underline"
+                    className="text-sm font-semibold text-[#315d7a]"
                 >
                     ← Volver al listado
                 </Link>
@@ -66,6 +58,7 @@ export default function Edit({
                         setData,
                         errors,
                         processing,
+                        planesEstudio,
                         semestres,
                         modulos,
                         tipos,
