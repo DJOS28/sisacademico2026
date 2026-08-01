@@ -91,7 +91,6 @@ function Icon({ name, className = 'h-5 w-5' }) {
                 <path d="M12 16h.01" />
             </>
         ),
-        check: <path d="m5 12 4 4L19 6" />,
     };
 
     return <svg {...props}>{icons[name]}</svg>;
@@ -109,33 +108,6 @@ function routeHref(routeName) {
     return routeExists(routeName) ? route(routeName) : '#';
 }
 
-const summaryCards = [
-    {
-        title: 'Cursos asignados',
-        value: '—',
-        description: 'Periodo académico actual',
-        icon: 'book',
-    },
-    {
-        title: 'Estudiantes a cargo',
-        value: '—',
-        description: 'Total de estudiantes',
-        icon: 'users',
-    },
-    {
-        title: 'Asistencias pendientes',
-        value: '—',
-        description: 'Sesiones por registrar',
-        icon: 'clipboard',
-    },
-    {
-        title: 'Evaluaciones pendientes',
-        value: '—',
-        description: 'Actividades por calificar',
-        icon: 'chart',
-    },
-];
-
 const quickAccess = [
     {
         label: 'Mis cursos',
@@ -149,79 +121,13 @@ const quickAccess = [
         icon: 'calendar',
         routeName: 'docente.horarios',
     },
-    {
-        label: 'Registrar asistencia',
-        description: 'Control de asistencia por sesión',
-        icon: 'clipboard',
-        routeName: 'docente.asistencia',
-    },
-    {
-        label: 'Registrar notas',
-        description: 'Carga y actualiza calificaciones',
-        icon: 'chart',
-        routeName: 'docente.notas',
-    },
-    {
-        label: 'Aula virtual',
-        description: 'Materiales, tareas y foros',
-        icon: 'file',
-        routeName: 'docente.materiales',
-    },
-    {
-        label: 'Mensajes',
-        description: 'Comunicación académica',
-        icon: 'message',
-        routeName: 'mensajes.index',
-    },
 ];
 
-const todaySchedule = [
-    {
-        time: '08:00',
-        title: 'Curso pendiente de conexión',
-        detail: 'El curso, aula y sección se mostrarán desde la base de datos.',
-        status: 'Próxima',
-    },
-    {
-        time: '10:30',
-        title: 'Curso pendiente de conexión',
-        detail: 'La información del horario se cargará dinámicamente.',
-        status: 'Programada',
-    },
-];
-
-const pendingTasks = [
-    {
-        title: 'Registrar asistencia',
-        detail: 'Sesión pendiente de cierre',
-        icon: 'clipboard',
-    },
-    {
-        title: 'Calificar evaluaciones',
-        detail: 'Actividades pendientes de revisión',
-        icon: 'chart',
-    },
-    {
-        title: 'Publicar material',
-        detail: 'Contenido pendiente en aula virtual',
-        icon: 'file',
-    },
-];
-
-const announcements = [
-    {
-        title: 'Bienvenido al portal docente',
-        detail: 'Desde este espacio podrás gestionar tu actividad académica.',
-        date: 'Hoy',
-    },
-    {
-        title: 'Módulos disponibles',
-        detail: 'Cursos, horarios, asistencia, notas y aula virtual.',
-        date: 'Sistema',
-    },
-];
-
-export default function DocenteDashboard() {
+export default function DocenteDashboard({
+    periodo = 'Periodo Activo',
+    summary = {},
+    todaySchedule = [],
+}) {
     const { auth } = usePage().props;
     const user = auth?.user ?? {};
 
@@ -229,6 +135,33 @@ export default function DocenteDashboard() {
         user.nombre_completo ||
         user.username ||
         'Docente';
+
+    const summaryCards = [
+        {
+            title: 'Cursos asignados',
+            value: summary.total_cursos ?? 0,
+            description: 'Periodo académico actual',
+            icon: 'book',
+        },
+        {
+            title: 'Estudiantes a cargo',
+            value: summary.total_estudiantes ?? 0,
+            description: 'Total de estudiantes matriculados',
+            icon: 'users',
+        },
+        {
+            title: 'Asistencias pendientes',
+            value: summary.asistencias_pendientes ?? 0,
+            description: 'Sesiones por registrar',
+            icon: 'clipboard',
+        },
+        {
+            title: 'Evaluaciones pendientes',
+            value: summary.evaluaciones_pendientes ?? 0,
+            description: 'Actividades por calificar',
+            icon: 'chart',
+        },
+    ];
 
     return (
         <AuthenticatedLayout
@@ -245,13 +178,13 @@ export default function DocenteDashboard() {
 
                         <p className="mt-1 text-sm text-slate-500">
                             Bienvenido, {displayName}. Gestiona tus cursos, asistencia,
-                            evaluaciones y aula virtual.
+                            evaluaciones y registros académicos.
                         </p>
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 font-bold">
                         <Icon name="calendar" className="h-4 w-4 text-[#315d7a]" />
-                        Periodo académico actual
+                        {periodo}
                     </div>
                 </div>
             }
@@ -259,11 +192,12 @@ export default function DocenteDashboard() {
             <Head title="Portal docente" />
 
             <div className="space-y-6">
+                {/* TARJETAS RESUMEN CON DATOS REALES */}
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {summaryCards.map((card) => (
                         <article
                             key={card.title}
-                            className="rounded-xl border border-slate-200 bg-white p-5"
+                            className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs"
                         >
                             <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -289,7 +223,8 @@ export default function DocenteDashboard() {
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+                    {/* CLASES DEL DÍA REALES */}
+                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs">
                         <div className="flex items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-base font-bold text-slate-900">
@@ -297,7 +232,7 @@ export default function DocenteDashboard() {
                                 </h2>
 
                                 <p className="mt-1 text-sm text-slate-500">
-                                    Cursos y sesiones programadas para la jornada.
+                                    Cursos y sesiones programadas para el día.
                                 </p>
                             </div>
 
@@ -316,43 +251,56 @@ export default function DocenteDashboard() {
                         </div>
 
                         <div className="mt-5 space-y-3">
-                            {todaySchedule.map((item) => (
-                                <div
-                                    key={`${item.time}-${item.title}`}
-                                    className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4"
-                                >
-                                    <div className="flex min-w-16 flex-col items-center justify-center rounded-lg bg-white px-3 py-2">
-                                        <Icon
-                                            name="clock"
-                                            className="h-4 w-4 text-[#315d7a]"
-                                        />
-                                        <span className="mt-1 text-sm font-bold text-slate-900">
-                                            {item.time}
-                                        </span>
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-start justify-between gap-2">
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {item.title}
-                                                </p>
-                                                <p className="mt-1 text-xs leading-5 text-slate-500">
-                                                    {item.detail}
-                                                </p>
-                                            </div>
-
-                                            <span className="rounded-full bg-[#eef3f7] px-2.5 py-1 text-[11px] font-semibold text-[#315d7a]">
-                                                {item.status}
+                            {todaySchedule.length > 0 ? (
+                                todaySchedule.map((item, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4"
+                                    >
+                                        <div className="flex min-w-16 flex-col items-center justify-center rounded-lg bg-white px-3 py-2 border border-slate-200/60">
+                                            <Icon
+                                                name="clock"
+                                                className="h-4 w-4 text-[#315d7a]"
+                                            />
+                                            <span className="mt-1 text-sm font-bold text-slate-900">
+                                                {item.time}
                                             </span>
                                         </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">
+                                                        {item.title}
+                                                    </p>
+                                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                        {item.detail}
+                                                    </p>
+                                                </div>
+
+                                                <span className="rounded-full bg-[#eef3f7] px-2.5 py-1 text-[11px] font-semibold text-[#315d7a]">
+                                                    {item.status}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
+                                ))
+                            ) : (
+                                <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                                    <Icon name="calendar" className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                                    <p className="text-sm font-bold text-slate-700">
+                                        No tienes clases programadas para hoy
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        Consulta tu horario semanal para revisar tus próximas sesiones.
+                                    </p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </article>
 
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+                    {/* ACCESOS RÁPIDOS */}
+                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs">
                         <div>
                             <h2 className="text-base font-bold text-slate-900">
                                 Accesos rápidos
@@ -401,115 +349,6 @@ export default function DocenteDashboard() {
                             })}
                         </div>
                     </article>
-                </section>
-
-                <section className="grid gap-6 xl:grid-cols-2">
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    Pendientes académicos
-                                </h2>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Actividades que requieren atención.
-                                </p>
-                            </div>
-
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
-                                <Icon name="alert" className="h-5 w-5" />
-                            </div>
-                        </div>
-
-                        <div className="mt-5 space-y-3">
-                            {pendingTasks.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4"
-                                >
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#315d7a]">
-                                        <Icon name={item.icon} className="h-4 w-4" />
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {item.title}
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            {item.detail}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </article>
-
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    Anuncios y comunicaciones
-                                </h2>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Novedades institucionales y académicas.
-                                </p>
-                            </div>
-
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
-                                <Icon name="bell" className="h-5 w-5" />
-                            </div>
-                        </div>
-
-                        <div className="mt-5 divide-y divide-slate-100">
-                            {announcements.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
-                                >
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                                        <Icon name="message" className="h-4 w-4" />
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {item.title}
-                                        </p>
-
-                                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                                            {item.detail}
-                                        </p>
-                                    </div>
-
-                                    <span className="whitespace-nowrap text-xs text-slate-400">
-                                        {item.date}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </article>
-                </section>
-
-                <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <div className="flex items-start gap-3">
-                        <Icon
-                            name="alert"
-                            className="mt-0.5 h-5 w-5 shrink-0 text-amber-700"
-                        />
-
-                        <div>
-                            <p className="text-sm font-semibold text-amber-800">
-                                Datos pendientes de conexión
-                            </p>
-
-                            <p className="mt-1 text-sm leading-6 text-amber-700">
-                                Los totales, horarios, cursos, asistencias y evaluaciones
-                                aparecerán cuando se conecte el DashboardController con las
-                                tablas académicas.
-                            </p>
-                        </div>
-                    </div>
                 </section>
             </div>
         </AuthenticatedLayout>

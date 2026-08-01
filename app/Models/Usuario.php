@@ -199,5 +199,13 @@ class Usuario extends Authenticatable
         return $this->estaActivo();
     }
 
+    /**
+     * Relación con perfil de Empresa (si el usuario es empleador)
+     */
+    public function empresa(): HasOne
+    {
+        return $this->hasOne(Empresa::class, 'usuario_id', 'id');
+    }
+
     
 }

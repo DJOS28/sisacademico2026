@@ -49,6 +49,23 @@ function Icon({ name, className = 'h-5 w-5' }) {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </>
         ),
+        'user-plus': (
+            <>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <line x1="20" y1="8" x2="20" y2="14" />
+                <line x1="17" y1="11" x2="23" y2="11" />
+            </>
+        ),
+        'file-text': (
+            <>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+            </>
+        ),
         wallet: (
             <>
                 <path d="M3 6h15a2 2 0 0 1 2 2v10H5a2 2 0 0 1-2-2V6Z" />
@@ -61,6 +78,20 @@ function Icon({ name, className = 'h-5 w-5' }) {
                 <rect x="3" y="7" width="18" height="13" rx="2" />
                 <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 <path d="M3 12h18" />
+            </>
+        ),
+        'book-open': (
+            <>
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </>
+        ),
+        grid: (
+            <>
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
             </>
         ),
         shield: (
@@ -110,19 +141,15 @@ function Icon({ name, className = 'h-5 w-5' }) {
         ),
     };
 
-    return <svg {...props}>{icons[name]}</svg>;
+    return <svg {...props}>{icons[name] || icons.grid}</svg>;
 }
 
-
 const adminNavigation = [
+    // --- MÓDULO 1: GENERAL / PANEL ---
     {
         id: 'general',
         moduleCode: 'PANEL',
-        moduleNames: [
-            'Panel principal',
-            'General',
-            'Dashboard',
-        ],
+        moduleNames: ['Panel principal', 'General', 'Dashboard'],
         label: 'General',
         icon: 'dashboard',
         items: [
@@ -133,6 +160,7 @@ const adminNavigation = [
         ],
     },
 
+    // --- MÓDULO 2: GESTIÓN INSTITUCIONAL ---
     {
         id: 'institucional',
         moduleCode: 'INSTITUCIONAL',
@@ -152,47 +180,19 @@ const adminNavigation = [
         label: 'Gestión institucional',
         icon: 'institution',
         items: [
-            {
-                label: 'Institución',
-                routeName: 'instituto.index',
-            },
-            {
-                label: 'Departamentos',
-                routeName: 'departamentos.index',
-            },
-            {
-                label: 'Provincias',
-                routeName: 'provincias.index',
-            },
-            {
-                label: 'Distritos',
-                routeName: 'distritos.index',
-            },
-            {
-                label: 'Áreas administrativas',
-                routeName: 'areas.index',
-            },
-            
-            {
-                label: 'Pabellones',
-                routeName: 'pabellones.index',
-            },
-            
-            {
-                label: 'Aulas',
-                routeName: 'aulas.index',
-            },
-            {
-                label: 'Turnos',
-                routeName: 'turnos.index',
-            },
-            {
-                label: 'Secciones',
-                routeName: 'secciones.index',
-            },
+            { label: 'Institución', routeName: 'instituto.index' },
+            { label: 'Departamentos', routeName: 'departamentos.index' },
+            { label: 'Provincias', routeName: 'provincias.index' },
+            { label: 'Distritos', routeName: 'distritos.index' },
+            { label: 'Áreas administrativas', routeName: 'areas.index' },
+            { label: 'Pabellones', routeName: 'pabellones.index' },
+            { label: 'Aulas', routeName: 'aulas.index' },
+            { label: 'Turnos', routeName: 'turnos.index' },
+            { label: 'Secciones', routeName: 'secciones.index' },
         ],
     },
 
+    // --- MÓDULO 3: GESTIÓN ACADÉMICA ---
     {
         id: 'academico',
         moduleCode: 'ACADEMICO',
@@ -205,41 +205,33 @@ const adminNavigation = [
         label: 'Gestión académica',
         icon: 'academic',
         items: [
-            {
-                label: 'Periodos académicos',
-                routeName: 'periodos.index',
-            },
-            {
-                label: 'Semestres',
-                routeName: 'semestres.index',
-            },
-            {
-                label: 'Planes de estudio',
-                routeName: 'planes-estudio.index',
-            },
-            {
-                label: 'Módulos formativos',
-                routeName: 'modulos-formativos.index',
-            },
-            {
-                label: 'Cursos',
-                routeName: 'cursos.index',
-            },
-            {
-                label: 'Horarios',
-                routeName: 'horarios.index',
-            },
-            {
-                label: 'Sesiones y asistencia',
-                routeName: 'sesiones.index',
-            },
-            {
-                label: 'Evaluaciones y notas',
-                routeName: 'evaluaciones.index',
-            },
+            { label: 'Periodos académicos', routeName: 'periodos.index' },
+            { label: 'Semestres', routeName: 'semestres.index' },
+            { label: 'Planes de estudio', routeName: 'planes-estudio.index' },
+            { label: 'Módulos formativos', routeName: 'modulos-formativos.index' },
+            { label: 'Cursos', routeName: 'cursos.index' },
+            { label: 'Horarios', routeName: 'horarios.index' },
         ],
     },
 
+    // --- MÓDULO 4: ADMISIÓN ---
+    {
+        id: 'admision',
+        moduleCode: 'ADMISION',
+        moduleNames: ['Admisión', 'Admision', 'Inscripciones', 'Postulantes'],
+        label: 'Admisión',
+        icon: 'user-plus',
+        items: [
+            { label: 'Requisitos', routeName: 'requisitos.index' },
+            { label: 'Medio de Pagos', routeName: 'tipos-pago.index' },
+            { label: 'Proceso de Admisión', routeName: 'admisiones.index' },
+            { label: 'Inscripciones', routeName: 'inscripciones.index' },
+            { label: 'Observados', routeName: 'admisiones.observados' },
+            { label: 'Rechazados', routeName: 'admisiones.rechazados' },
+        ],
+    },
+
+    // --- MÓDULO 5: ESTUDIANTES Y MATRÍCULA ---
     {
         id: 'estudiantes',
         moduleCode: 'ESTUDIANTES',
@@ -249,67 +241,96 @@ const adminNavigation = [
             'Gestion de estudiantes',
             'Matrícula',
             'Matricula',
-            'Admisión',
-            'Admision',
         ],
-        label: 'Admisión y matrícula',
+        label: 'Estudiantes y matrícula',
         icon: 'users',
         items: [
-            {
-                label: 'Admisión',
-                routeName: 'admisiones.index',
-            },
-            {
-                label: 'Postulantes',
-                routeName: 'postulantes.index',
-            },
-            {
-                label: 'Matrículas',
-                routeName: 'matriculas.index',
-            },
-            {
-                label: 'Asistencia',
-                routeName: 'asistencias.index',
-            },
-            {
-                label: 'Trámites académicos',
-                routeName: 'tramites.index',
-            },
+            { label: 'Estudiantes', routeName: 'estudiantes.index' },
+            { label: 'Matrículas', routeName: 'matriculas.index' },
+            { label: 'Convalidaciones', routeName: 'convalidaciones.index' },
+            { label: 'Boleta de Notas', routeName: 'boleta_notas.index' },
         ],
     },
 
+    // --- MÓDULO 6: TRÁMITES ACADÉMICOS ---
     {
-        id: 'administracion',
-        moduleCode: 'ADMINISTRACION',
+        id: 'tramites',
+        moduleCode: 'TRAMITES',
         moduleNames: [
+            'Trámites académicos',
+            'Tramites academicos',
+            'Trámites',
+            'Tramites',
+            'Mesa de Partes',
+        ],
+        label: 'Trámites académicos',
+        icon: 'file-text',
+        items: [
+            { label: 'Gestión de trámites', routeName: 'tramites.index' },
+        ],
+    },
+
+    // --- MÓDULO 7: CAJA Y ADMINISTRACIÓN FINANCIERA ---
+    {
+        id: 'caja',
+        moduleCode: 'CAJA',
+        moduleNames: [
+            'Caja',
+            'Pagos',
             'Administración',
             'Administracion',
             'Administración General',
             'Administracion General',
-            'Caja',
         ],
-        label: 'Administración',
+        label: 'Caja y Pagos',
         icon: 'wallet',
         items: [
-            {
-                label: 'Caja',
-                routeName: 'caja.index',
-            },
-            {
-                label: 'Pagos',
-                routeName: 'pagos.index',
-            },
-            {
-                label: 'Conceptos de pago',
-                routeName: 'conceptos.index',
-            },
-            {
-                label: 'Bienes patrimoniales',
-                routeName: 'bienes.index',
-            },
+            { label: 'Apertura y Cierre de Caja', routeName: 'caja.index' },
+            { label: 'Pagos y cobros', routeName: 'pagos.index' },
+            { label: 'Conceptos de pago', routeName: 'conceptos.index' },
+            { label: 'Bienes patrimoniales', routeName: 'bienes.index' },
         ],
     },
 
+    // --- MÓDULO 8: BOLSA LABORAL Y PRÁCTICAS ---
+    {
+        id: 'bolsa-laboral',
+        moduleCode: 'BOLSA_LABORAL',
+        moduleNames: [
+            'Bolsa Laboral',
+            'Bolsa laboral',
+            'Oportunidades laborales',
+            'Prácticas',
+            'Practicas',
+        ],
+        label: 'Bolsa laboral',
+        icon: 'briefcase',
+        items: [
+            { label: 'Empresas', routeName: 'empresas.index' },
+            { label: 'Tipo de Contrato', routeName: 'tipos-contrato.index' },
+            { label: 'Ofertas laborales', routeName: 'ofertas-laborales.index' },
+            { label: 'Reporte', routeName: 'panel-analitico.index' },
+        ],
+    },
+
+    // --- MÓDULO 9: REPOSITORIO ACADÉMICO ---
+    {
+        id: 'repositorio',
+        moduleCode: 'REPOSITORIO',
+        moduleNames: [
+            'Repositorio académico',
+            'Repositorio academicos',
+            'Repositorio',
+            'Biblioteca digital',
+        ],
+        label: 'Repositorio académico',
+        icon: 'book-open',
+        items: [
+            { label: 'Documentos y publicaciones', routeName: 'repositorio.index' },
+        ],
+    },
+
+    // --- MÓDULO 10: SERVICIOS Y COMUNICACIÓN ---
     {
         id: 'servicios',
         moduleCode: 'SERVICIOS',
@@ -317,36 +338,18 @@ const adminNavigation = [
             'Servicios académicos',
             'Servicios academicos',
             'Servicios',
-            'Bolsa Laboral',
-            'Mesa de Partes',
             'Anuncios',
+            'Encuestas',
         ],
-        label: 'Servicios académicos',
-        icon: 'briefcase',
+        label: 'Servicios e interacción',
+        icon: 'grid',
         items: [
-            {
-                label: 'Encuestas',
-                routeName: 'encuestas.index',
-            },
-            {
-                label: 'Bolsa laboral',
-                routeName: 'ofertas-laborales.index',
-            },
-            {
-                label: 'Prácticas profesionales',
-                routeName: 'practicas.index',
-            },
-            {
-                label: 'Repositorio académico',
-                routeName: 'repositorio.index',
-            },
-            {
-                label: 'Anuncios y foros',
-                routeName: 'anuncios.index',
-            },
+            { label: 'Encuestas', routeName: 'encuestas.index' },
+            { label: 'Anuncios y foros', routeName: 'anuncios.index' },
         ],
     },
 
+    // --- MÓDULO 11: SEGURIDAD Y SISTEMA ---
     {
         id: 'sistema',
         moduleCode: 'SEGURIDAD',
@@ -362,34 +365,13 @@ const adminNavigation = [
         label: 'Seguridad y sistema',
         icon: 'shield',
         items: [
-            {
-                label: 'Usuarios',
-                routeName: 'usuarios.index',
-            },
-            {
-                label: 'Administradores',
-                routeName: 'administradores.index',
-            },
-            {
-                label: 'Personal',
-                routeName: 'personal.index',
-            },
-            {
-                label: 'Docentes',
-                routeName: 'docentes.index',
-            },
-            {
-                label: 'Roles y permisos',
-                routeName: 'roles.index',
-            },
-            {
-                label: 'Módulos y accesos',
-                routeName: 'modulos.index',
-            },
-            {
-                label: 'Auditoría',
-                routeName: 'auditoria.index',
-            },
+            { label: 'Usuarios', routeName: 'usuarios.index' },
+            { label: 'Administradores', routeName: 'administradores.index' },
+            { label: 'Personal', routeName: 'personal.index' },
+            { label: 'Docentes', routeName: 'docentes.index' },
+            { label: 'Roles y permisos', routeName: 'roles.index' },
+            { label: 'Módulos y accesos', routeName: 'modulos.index' },
+            { label: 'Auditoría', routeName: 'auditoria.index' },
         ],
     },
 ];
@@ -411,20 +393,6 @@ const docenteNavigation = [
             { label: 'Mis cursos', routeName: 'docente.cursos' },
             { label: 'Mi horario', routeName: 'docente.horarios' },
             { label: 'Mis estudiantes', routeName: 'docente.estudiantes' },
-            { label: 'Asistencia', routeName: 'docente.asistencia' },
-            { label: 'Evaluaciones', routeName: 'docente.evaluaciones' },
-            { label: 'Registro de notas', routeName: 'docente.notas' },
-        ],
-    },
-    {
-        id: 'aula-virtual',
-        label: 'Aula virtual',
-        icon: 'academic',
-        alwaysVisible: true,
-        items: [
-            { label: 'Materiales', routeName: 'docente.materiales' },
-            { label: 'Tareas', routeName: 'docente.tareas' },
-            { label: 'Foros', routeName: 'docente.foros' },
         ],
     },
     {
@@ -445,7 +413,10 @@ const estudianteNavigation = [
         label: 'General',
         icon: 'dashboard',
         alwaysVisible: true,
-        items: [{ label: 'Mi panel', routeName: 'dashboard' }],
+        items: [
+            { label: 'Mi panel', routeName: 'dashboard' },
+            { label: 'Mi perfil', routeName: 'estudiante.perfil.edit' },
+        ],
     },
     {
         id: 'formacion',
@@ -512,7 +483,7 @@ function isRouteActive(routeName) {
     try {
         return (
             route().current(routeName) ||
-            route().current(`${routeName.split('.')[0]}.*`)
+            route().current(`${routeName}.*`)
         );
     } catch {
         return false;
@@ -643,7 +614,7 @@ export default function AuthenticatedLayout({ header, children }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#f4f6f8] text-slate-900">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_#dcecf2_0,_#eef3f7_36%,_#eef3f7_100%)] text-[#172b3a]">
             {sidebarOpen && (
                 <button
                     type="button"
@@ -655,14 +626,14 @@ export default function AuthenticatedLayout({ header, children }) {
 
             <aside
                 className={[
-                    'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#dce3ea] bg-white transition-all duration-300',
+                    'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-gradient-to-b from-[#123B57] via-[#123B57] to-[#0F2F46] text-white shadow-2xl transition-all duration-300',
                     sidebarOpen
                         ? 'translate-x-0'
                         : '-translate-x-full lg:translate-x-0',
                     sidebarCollapsed ? 'lg:w-20' : 'w-[290px] lg:w-[290px]',
                 ].join(' ')}
             >
-                <div className="flex min-h-20 items-center justify-between border-b border-[#dce3ea] px-5 py-3">
+                <div className="flex min-h-20 items-center justify-between border-b border-white/10 px-5 py-3">
                     <Link
                         href={getHref('dashboard')}
                         className="flex min-w-0 items-center gap-3"
@@ -671,16 +642,16 @@ export default function AuthenticatedLayout({ header, children }) {
                             <img
                                 src={instituto.logo}
                                 alt={instituto.nombre || 'Instituto'}
-                                className="h-11 w-11 shrink-0 rounded-md object-contain"
+                                className="h-11 w-11 shrink-0 rounded-lg bg-white/95 p-1 object-contain shadow-sm"
                             />
                         )}
 
                         {!sidebarCollapsed && (
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-slate-900">
+                                <p className="truncate text-sm font-bold text-white">
                                     {instituto?.nombre || 'Sistema Académico'}
                                 </p>
-                                <p className="truncate text-xs text-slate-500">
+                                <p className="truncate text-xs text-slate-300">
                                     {isEstudiante
                                         ? 'Portal del estudiante'
                                         : isDocente
@@ -694,7 +665,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     <button
                         type="button"
                         onClick={() => setSidebarOpen(false)}
-                        className="rounded-md p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 lg:hidden"
+                        className="rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white lg:hidden"
                         aria-label="Cerrar menú"
                     >
                         <Icon name="close" className="h-5 w-5" />
@@ -704,7 +675,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 <div className="flex-1 overflow-y-auto px-3 py-4">
                     {!sidebarCollapsed && (
                         <div className="mb-3 px-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-300/80">
                                 {isEstudiante
                                     ? 'Portal del estudiante'
                                     : isDocente
@@ -729,8 +700,8 @@ export default function AuthenticatedLayout({ header, children }) {
                                         className={[
                                             'flex w-full items-center rounded-lg px-3 py-2.5 text-left transition-colors',
                                             groupActive
-                                                ? 'bg-[#eaf1f6] text-[#315d7a]'
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                                                ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10'
+                                                : 'text-slate-200 hover:bg-white/10 hover:text-white',
                                             sidebarCollapsed
                                                 ? 'justify-center'
                                                 : 'justify-between',
@@ -743,8 +714,8 @@ export default function AuthenticatedLayout({ header, children }) {
                                                 className={[
                                                     'h-[18px] w-[18px] shrink-0',
                                                     groupActive
-                                                        ? 'text-[#315d7a]'
-                                                        : 'text-slate-400',
+                                                        ? 'text-[#5EEAD4]'
+                                                        : 'text-slate-300',
                                                 ].join(' ')}
                                             />
 
@@ -759,7 +730,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             <Icon
                                                 name="chevronDown"
                                                 className={[
-                                                    'h-4 w-4 text-slate-400 transition-transform',
+                                                    'h-4 w-4 text-slate-300 transition-transform',
                                                     isOpen ? 'rotate-180' : '',
                                                 ].join(' ')}
                                             />
@@ -767,10 +738,9 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </button>
 
                                     {!sidebarCollapsed && isOpen && (
-                                        <div className="ml-5 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
+                                        <div className="ml-5 mt-1 space-y-0.5 border-l border-white/15 pl-3">
                                             {group.items.map((item) => {
                                                 const active = isRouteActive(item.routeName);
-
                                                 const exists = routeExists(item.routeName);
 
                                                 return (
@@ -784,20 +754,20 @@ export default function AuthenticatedLayout({ header, children }) {
                                                         className={[
                                                             'relative flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
                                                             active
-                                                                ? 'bg-[#eef3f7] font-semibold text-[#315d7a]'
+                                                                ? 'bg-white/12 font-semibold text-white'
                                                                 : exists
-                                                                  ? 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                                                                  : 'cursor-not-allowed text-slate-300',
+                                                                  ? 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                                                  : 'cursor-not-allowed text-slate-500',
                                                         ].join(' ')}
                                                     >
                                                         {active && (
-                                                            <span className="absolute -left-[13px] h-5 w-0.5 rounded-full bg-[#315d7a]" />
+                                                            <span className="absolute -left-[13px] h-5 w-0.5 rounded-full bg-[#D7A62E]" />
                                                         )}
                                                         <span className="truncate">
                                                             {item.label}
                                                         </span>
                                                         {!exists && (
-                                                            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
+                                                            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
                                                                 Próximo
                                                             </span>
                                                         )}
@@ -812,10 +782,10 @@ export default function AuthenticatedLayout({ header, children }) {
                     </nav>
                 </div>
 
-                <div className="border-t border-[#dce3ea] p-3">
-                    <div className="rounded-lg border border-[#dce3ea] bg-[#f8fafc] p-3">
+                <div className="border-t border-white/10 p-3">
+                    <div className="rounded-xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#315d7a] text-sm font-bold text-white">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#16A6A1] text-sm font-bold text-white shadow-sm">
                                 {user.img ? (
                                     <img
                                         src={user.img}
@@ -829,13 +799,13 @@ export default function AuthenticatedLayout({ header, children }) {
 
                             {!sidebarCollapsed && (
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-900">
+                                    <p className="truncate text-sm font-semibold text-white">
                                         {fullName}
                                     </p>
-                                    <p className="truncate text-xs font-medium text-[#315d7a]">
+                                    <p className="truncate text-xs font-medium text-[#5EEAD4]">
                                         {mainRole}
                                     </p>
-                                    <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                    <p className="mt-0.5 truncate text-[11px] text-slate-300">
                                         Usuario: {username}
                                     </p>
                                 </div>
@@ -858,7 +828,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-[290px]',
                 ].join(' ')}
             >
-                <header className="sticky top-0 z-30 border-b border-[#dce3ea] bg-white">
+                <header className="sticky top-0 z-30 border-b border-[#d4e0e8] bg-[#f8fbfd]/95 shadow-sm backdrop-blur">
                     <div className="flex h-20 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center gap-3">
                             <button
@@ -875,7 +845,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 onClick={() =>
                                     setSidebarCollapsed((value) => !value)
                                 }
-                                className="hidden rounded-md border border-[#dce3ea] bg-white p-2.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 lg:inline-flex"
+                                className="hidden rounded-lg border border-[#d5e1e8] bg-white p-2.5 text-[#315d7a] shadow-sm transition hover:border-[#16A6A1] hover:bg-[#f1fbfa] lg:inline-flex"
                                 aria-label="Contraer menú"
                             >
                                 <Icon name="menu" className="h-5 w-5" />
@@ -904,7 +874,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <input
                                     type="search"
                                     placeholder="Buscar en el sistema..."
-                                    className="w-72 rounded-lg border border-[#dce3ea] bg-[#f8fafc] py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#315d7a] focus:bg-white focus:ring-4 focus:ring-[#dfeaf1]"
+                                    className="w-72 rounded-xl border border-[#d5e1e8] bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#16A6A1] focus:ring-4 focus:ring-[#16A6A1]/10"
                                 />
                             </div>
 
@@ -919,7 +889,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
                             <button
                                 type="button"
-                                className="relative rounded-md border border-[#dce3ea] bg-white p-2.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                                className="relative rounded-lg border border-[#d5e1e8] bg-white p-2.5 text-[#315d7a] shadow-sm transition hover:border-[#16A6A1] hover:bg-[#f1fbfa]"
                                 aria-label="Notificaciones"
                             >
                                 <Icon name="bell" className="h-5 w-5" />
@@ -930,9 +900,9 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <Dropdown.Trigger>
                                     <button
                                         type="button"
-                                        className="flex items-center gap-3 rounded-lg border border-[#dce3ea] bg-white p-1.5 pr-3 transition hover:bg-slate-50"
+                                        className="flex items-center gap-3 rounded-xl border border-[#d5e1e8] bg-white p-1.5 pr-3 shadow-sm transition hover:border-[#16A6A1] hover:bg-[#f8fbfd]"
                                     >
-                                        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-[#315d7a] text-sm font-bold text-white">
+                                        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-[#176B87] to-[#123B57] text-sm font-bold text-white">
                                             {user.img ? (
                                                 <img
                                                     src={user.img}
@@ -948,7 +918,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             <p className="max-w-44 truncate text-sm font-semibold text-slate-900">
                                                 {fullName}
                                             </p>
-                                            <p className="max-w-44 truncate text-xs text-[#315d7a]">
+                                            <p className="max-w-44 truncate text-xs text-[#176B87]">
                                                 {mainRole}
                                             </p>
                                         </div>
@@ -965,7 +935,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         <p className="truncate text-sm font-semibold text-slate-900">
                                             {fullName}
                                         </p>
-                                        <p className="truncate text-xs text-[#315d7a]">
+                                        <p className="truncate text-xs text-[#176B87]">
                                             {mainRole}
                                         </p>
                                         <p className="mt-1 truncate text-xs text-slate-400">
@@ -998,7 +968,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
 
                     {searchOpen && (
-                        <div className="border-t border-slate-100 px-4 py-3 md:hidden">
+                        <div className="border-t border-[#dce7ed] bg-white/90 px-4 py-3 md:hidden">
                             <div className="relative">
                                 <Icon
                                     name="search"
@@ -1008,7 +978,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                     type="search"
                                     autoFocus
                                     placeholder="Buscar en el sistema..."
-                                    className="w-full rounded-lg border border-[#dce3ea] bg-[#f8fafc] py-2.5 pl-10 pr-4 text-sm outline-none focus:border-[#315d7a] focus:bg-white focus:ring-4 focus:ring-[#dfeaf1]"
+                                    className="w-full rounded-xl border border-[#d5e1e8] bg-white py-2.5 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-[#16A6A1] focus:ring-4 focus:ring-[#16A6A1]/10"
                                 />
                             </div>
                         </div>
@@ -1016,12 +986,13 @@ export default function AuthenticatedLayout({ header, children }) {
                 </header>
 
                 {header && (
-                    <section className="border-b border-[#dce3ea] bg-white">
+                    <section className="border-b border-[#d7e2e9] bg-gradient-to-r from-[#f8fbfd] via-white to-[#e9f5f5]">
                         <div className="px-4 py-6 sm:px-6 lg:px-8">{header}</div>
                     </section>
                 )}
 
                 <main className="px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="mb-6 h-1 w-full rounded-full bg-gradient-to-r from-[#123B57] via-[#16A6A1] to-[#D7A62E] opacity-80" />
                     <div className="mx-auto w-full max-w-[1600px]">
                         {children}
                     </div>

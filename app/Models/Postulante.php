@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Postulante extends Model
 {
@@ -48,46 +51,177 @@ class Postulante extends Model
         'grado',
     ];
 
-    protected $casts = [
-        'fecha_nacimiento' => 'date',
-        'fecha_registro' => 'datetime',
-        'discapacidad' => 'integer',
-        'usuario_id' => 'integer',
-        'id_colegio' => 'integer',
-        'id_medio_pago' => 'integer',
+    protected $appends = [
+        'nombre_completo',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'id_postulante' => 'integer',
+            'fecha_nacimiento' => 'date:Y-m-d',
+            'fecha_registro' => 'datetime',
+            'discapacidad' => 'boolean',
+            'usuario_id' => 'integer',
+            'id_colegio' => 'integer',
+            'id_medio_pago' => 'integer',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Nombre completo del postulante o estudiante.
+     */
+    protected function nombreCompleto(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => trim(($this->nombres ?? '') . ' ' . ($this->apellidos ?? ''))
+        );
+    }
+
+    /**
+     * Usuario vinculado al postulante.
+     */
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(
-            Usuario::class,
-            'usuario_id',
-            'id'
-        );
+        return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /**
+     * Colegio de procedencia.
+     */
     public function colegio(): BelongsTo
     {
-        return $this->belongsTo(
-            Colegio::class,
-            'id_colegio',
-            'id_colegio'
-        );
+        return $this->belongsTo(Colegio::class, 'id_colegio', 'id_colegio');
     }
 
+    /**
+     * Medio o tipo de pago registrado.
+     *
+     * Se conserva el nombre medioPago porque el controlador utiliza esa relación.
+     */
+    public function medioPago(): BelongsTo
+    {
+        return $this->belongsTo(TipoPago::class, 'id_medio_pago', 'id_tipo_pago');
+    }
+
+    /**
+     * Alias compatible con código anterior.
+     */
     public function tipoPago(): BelongsTo
     {
-        return $this->belongsTo(
-            TipoPago::class,
-            'id_medio_pago',
-            'id_tipo_pago'
-        );
+        return $this->medioPago();
     }
 
-    public function getNombreCompletoAttribute(): string
+    
+
+    /**
+     * Inscripciones realizadas.
+     */
+    public function inscripciones(): HasMany
     {
-        return trim(
-            ($this->nombres ?? '') . ' ' . ($this->apellidos ?? '')
-        );
+        return $this->hasMany(Inscripcion::class, 'id_postulante', 'id_postulante');
+    }
+
+    /**
+     * Matrículas académicas.
+     */
+    public function matriculas(): HasMany
+    {
+        return $this->hasMany(Matricula::class, 'postulante_id', 'id_postulante');
+    }
+
+    /**
+     * Pagos realizados por el postulante.
+     */
+    public function pagosPostulantes(): HasMany
+    {
+        return $this->hasMany(PagoPostulante::class, 'postulante_id', 'id_postulante');
+    }
+
+    /**
+     * Resultados de admisión.
+     */
+    public function resultadosAdmision(): HasMany
+    {
+        return $this->hasMany(ResultadoAdmision::class, 'postulante_id', 'id_postulante');
+    }
+
+    /**
+     * Prácticas profesionales.
+     */
+    public function practicasProfesionales(): HasMany
+    {
+        return $this->hasMany(PracticaProfesional::class, 'postulante_id', 'id_postulante');
+    }
+
+    /**
+     * Solicitudes de trámites.
+     */
+    public function solicitudesTramites(): HasMany
+    {
+        return $this->hasMany(SolicitudTramite::class, 'postulante_id', 'id_postulante');
+    }
+
+    /**
+     * Permite buscar por código, DNI, nombres, apellidos, correo o teléfono.
+     */
+    public function scopeBuscar($query, ?string $buscar)
+    {
+        $buscar = trim((string) $buscar);
+
+        if ($buscar === '') {
+            return $query;
+        }
+
+        return $query->where(function ($subquery) use ($buscar) {
+            $subquery->where('codigo_postulante', 'like', "%{$buscar}%")
+                ->orWhere('dni', 'like', "%{$buscar}%")
+                ->orWhere('nombres', 'like', "%{$buscar}%")
+                ->orWhere('apellidos', 'like', "%{$buscar}%")
+                ->orWhere('email', 'like', "%{$buscar}%")
+                ->orWhere('telefono', 'like', "%{$buscar}%");
+        });
+    }
+
+    /**
+     * Filtra únicamente postulantes con usuario.
+     */
+    public function scopeConUsuario($query)
+    {
+        return $query->whereNotNull('usuario_id');
+    }
+
+    /**
+     * Filtra únicamente postulantes sin usuario.
+     */
+    public function scopeSinUsuario($query)
+    {
+        return $query->whereNull('usuario_id');
+    }
+
+    /**
+     * Filtra personas registradas como estudiantes.
+     */
+    public function scopeEstudiantes($query)
+    {
+        return $query->where('grado', 'Estudiante');
+    }
+
+    /**
+     * Filtra personas con discapacidad registrada.
+     */
+    public function scopeConDiscapacidad($query)
+    {
+        return $query->where('discapacidad', true);
+    }
+
+    /**
+     * Postulaciones realizadas por el estudiante.
+     */
+    public function postulaciones(): HasMany
+    {
+        return $this->hasMany(Postulacion::class, 'id_postulante', 'id_postulante');
     }
 }

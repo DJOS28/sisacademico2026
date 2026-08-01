@@ -79,16 +79,14 @@ function Icon({ name, className = 'h-5 w-5' }) {
             </>
         ),
         check: <path d="m5 12 4 4L19 6" />,
-        alert: (
+        sparkles: (
             <>
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 8v4" />
-                <path d="M12 16h.01" />
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
             </>
-        ),
+        )
     };
 
-    return <svg {...props}>{icons[name]}</svg>;
+    return <svg {...props}>{icons[name] ?? null}</svg>;
 }
 
 function routeExists(routeName) {
@@ -103,101 +101,57 @@ function routeHref(routeName) {
     return routeExists(routeName) ? route(routeName) : '#';
 }
 
-const summaryCards = [
-    {
-        title: 'Cursos matriculados',
-        value: '—',
-        description: 'Periodo académico actual',
-        icon: 'book',
-    },
-    {
-        title: 'Promedio general',
-        value: '—',
-        description: 'Rendimiento acumulado',
-        icon: 'chart',
-    },
-    {
-        title: 'Asistencia',
-        value: '—',
-        description: 'Porcentaje del periodo',
-        icon: 'check',
-    },
-    {
-        title: 'Pagos pendientes',
-        value: '—',
-        description: 'Obligaciones por regularizar',
-        icon: 'wallet',
-    },
-];
-
 const quickAccess = [
     {
         label: 'Mi horario',
-        description: 'Consulta tus clases programadas',
+        description: 'Consulta tus clases e itinerario',
         icon: 'calendar',
         routeName: 'estudiante.horario',
+        bg: 'bg-blue-50 text-blue-700',
     },
     {
         label: 'Mis notas',
-        description: 'Revisa tus calificaciones',
+        description: 'Revisa tu récord y promedios',
         icon: 'chart',
         routeName: 'estudiante.notas',
+        bg: 'bg-emerald-50 text-emerald-700',
     },
     {
         label: 'Mis pagos',
-        description: 'Consulta deudas y comprobantes',
+        description: 'Consulta tus cuotas y voucher',
         icon: 'wallet',
         routeName: 'estudiante.pagos',
+        bg: 'bg-amber-50 text-amber-700',
     },
     {
         label: 'Mis trámites',
-        description: 'Solicitudes y seguimiento',
+        description: 'Solicitudes y estado de peticiones',
         icon: 'file',
         routeName: 'estudiante.tramites',
+        bg: 'bg-purple-50 text-purple-700',
     },
     {
         label: 'Aula virtual',
-        description: 'Materiales, tareas y evaluaciones',
+        description: 'Materiales, tareas y exámenes',
         icon: 'book',
         routeName: 'estudiante.materiales',
+        bg: 'bg-sky-50 text-sky-700',
     },
     {
         label: 'Bolsa laboral',
-        description: 'Ofertas y oportunidades',
+        description: 'Ofertas de empleo y prácticas',
         icon: 'briefcase',
         routeName: 'ofertas-laborales.index',
+        bg: 'bg-indigo-50 text-indigo-700',
     },
 ];
 
-const todaySchedule = [
-    {
-        time: '08:00',
-        title: 'Curso pendiente de conexión',
-        detail: 'El horario se mostrará cuando se conecte la base de datos.',
-        status: 'Próximo',
-    },
-    {
-        time: '10:30',
-        title: 'Curso pendiente de conexión',
-        detail: 'El aula y docente se cargarán dinámicamente.',
-        status: 'Programado',
-    },
-];
-
-const announcements = [
-    {
-        title: 'Bienvenido al portal del estudiante',
-        detail: 'Desde este espacio podrás consultar tu información académica.',
-        date: 'Hoy',
-    },
-    {
-        title: 'Servicios disponibles',
-        detail: 'Horarios, notas, pagos, trámites y aula virtual.',
-        date: 'Sistema',
-    },
-];
-
-export default function EstudianteDashboard() {
+export default function EstudianteDashboard({
+    periodo = 'Periodo Activo',
+    summary = {},
+    todaySchedule = [],
+    announcements = [],
+}) {
     const { auth } = usePage().props;
     const user = auth?.user ?? {};
 
@@ -206,139 +160,197 @@ export default function EstudianteDashboard() {
         user.username ||
         'Estudiante';
 
+    const summaryCards = [
+        {
+            title: 'Cursos matriculados',
+            value: summary.total_cursos ?? 0,
+            description: 'Asignaturas del ciclo',
+            icon: 'book',
+            color: 'text-sky-600',
+            bgColor: 'bg-sky-50',
+        },
+        {
+            title: 'Promedio acumulado',
+            value: summary.promedio_general ?? '—',
+            description: 'Rendimiento académico',
+            icon: 'chart',
+            color: 'text-emerald-600',
+            bgColor: 'bg-emerald-50',
+        },
+        {
+            title: 'Asistencia general',
+            value: summary.porcentaje_asistencia ?? '100%',
+            description: 'Asistencia a sesiones',
+            icon: 'check',
+            color: 'text-indigo-600',
+            bgColor: 'bg-indigo-50',
+        },
+        {
+            title: 'Comprobantes / Pagos',
+            value: summary.pagos_realizados ?? 0,
+            description: 'Pagos registrados',
+            icon: 'wallet',
+            color: 'text-amber-600',
+            bgColor: 'bg-amber-50',
+        },
+    ];
+
     return (
         <AuthenticatedLayout
             header={
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p className="text-sm font-semibold text-[#315d7a]">
-                            Portal del estudiante
-                        </p>
-
-                        <h1 className="mt-1 text-2xl font-bold text-slate-900">
-                            Mi panel académico
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#315d7a]/10 text-[#315d7a]">
+                                Portal del estudiante
+                            </span>
+                        </div>
+                        <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">
+                            ¡Hola, {displayName}! 👋
                         </h1>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            Bienvenido, {displayName}. Aquí encontrarás tu información académica y servicios.
+                        <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                            Bienvenido a tu portal académico. Revisa tus clases del día y estado académico.
                         </p>
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs">
                         <Icon name="calendar" className="h-4 w-4 text-[#315d7a]" />
-                        Periodo académico actual
+                        <span>{periodo}</span>
                     </div>
                 </div>
             }
         >
-            <Head title="Portal del estudiante" />
+            <Head title="Portal del Estudiante" />
 
             <div className="space-y-6">
+                
+                {/* TARJETAS RESUMEN DE INDICADORES */}
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {summaryCards.map((card) => (
                         <article
                             key={card.title}
-                            className="rounded-xl border border-slate-200 bg-white p-5"
+                            className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-md transition-all group"
                         >
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <p className="text-sm font-medium text-slate-500">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                                         {card.title}
                                     </p>
 
-                                    <p className="mt-3 text-3xl font-bold text-slate-900">
+                                    <p className="mt-2 text-3xl font-extrabold text-slate-900 tracking-tight">
                                         {card.value}
                                     </p>
 
-                                    <p className="mt-2 text-xs text-slate-400">
+                                    <p className="mt-1 text-xs text-slate-500">
                                         {card.description}
                                     </p>
                                 </div>
 
-                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
-                                    <Icon name={card.icon} className="h-5 w-5" />
+                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${card.bgColor} ${card.color} group-hover:scale-105 transition-transform`}>
+                                    <Icon name={card.icon} className="h-6 w-6" />
                                 </div>
                             </div>
                         </article>
                     ))}
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    Horario de hoy
-                                </h2>
+                {/* HORARIO DEL DÍA Y ACCESOS RÁPIDOS */}
+                <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+                    
+                    {/* SECCIÓN HORARIO DE HOY */}
+                    <article className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                                <div>
+                                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                        <Icon name="clock" className="h-5 w-5 text-[#315d7a]" />
+                                        <span>Horario de clases de hoy</span>
+                                    </h2>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Sesiones programadas para la jornada de hoy.
+                                    </p>
+                                </div>
 
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Clases y actividades programadas.
-                                </p>
+                                <Link
+                                    href={routeHref('estudiante.horario')}
+                                    className={[
+                                        'inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition',
+                                        routeExists('estudiante.horario')
+                                            ? 'hover:bg-slate-50 hover:border-[#315d7a] hover:text-[#315d7a]'
+                                            : 'pointer-events-none opacity-50',
+                                    ].join(' ')}
+                                >
+                                    <span>Ver horario completo</span>
+                                    <Icon name="arrowRight" className="h-3.5 w-3.5" />
+                                </Link>
                             </div>
 
-                            <Link
-                                href={routeHref('estudiante.horario')}
-                                className={[
-                                    'inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600',
-                                    routeExists('estudiante.horario')
-                                        ? 'hover:bg-slate-50'
-                                        : 'pointer-events-none opacity-50',
-                                ].join(' ')}
-                            >
-                                Ver horario
-                                <Icon name="arrowRight" className="h-4 w-4" />
-                            </Link>
-                        </div>
-
-                        <div className="mt-5 space-y-3">
-                            {todaySchedule.map((item) => (
-                                <div
-                                    key={`${item.time}-${item.title}`}
-                                    className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4"
-                                >
-                                    <div className="flex min-w-16 flex-col items-center justify-center rounded-lg bg-white px-3 py-2">
-                                        <Icon
-                                            name="clock"
-                                            className="h-4 w-4 text-[#315d7a]"
-                                        />
-                                        <span className="mt-1 text-sm font-bold text-slate-900">
-                                            {item.time}
-                                        </span>
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-start justify-between gap-2">
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {item.title}
-                                                </p>
-                                                <p className="mt-1 text-xs leading-5 text-slate-500">
-                                                    {item.detail}
-                                                </p>
+                            <div className="mt-5 space-y-3">
+                                {todaySchedule.length > 0 ? (
+                                    todaySchedule.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex items-center gap-4 rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 hover:bg-white hover:border-[#315d7a]/40 transition"
+                                        >
+                                            <div className="flex min-w-[95px] flex-col items-center justify-center rounded-xl bg-white px-3 py-2 border border-slate-200/80 shadow-2xs">
+                                                <span className="text-xs font-bold text-[#315d7a]">
+                                                    {item.time}
+                                                </span>
                                             </div>
 
-                                            <span className="rounded-full bg-[#eef3f7] px-2.5 py-1 text-[11px] font-semibold text-[#315d7a]">
-                                                {item.status}
-                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                                    <div>
+                                                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                                                            {item.title}
+                                                        </h3>
+                                                        <p className="mt-1 text-xs text-slate-500">
+                                                            {item.detail}
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2.5 py-0.5 text-[10px] font-bold">
+                                                        {item.status}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center my-4">
+                                        <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                                            <Icon name="calendar" className="h-6 w-6" />
+                                        </div>
+                                        <h3 className="text-sm font-bold text-slate-800">
+                                            ¡Sin clases programadas para hoy!
+                                        </h3>
+                                        <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                                            Aprovecha para repasar tus tareas, lecturas o consultar las novedades del aula virtual.
+                                        </p>
                                     </div>
-                                </div>
-                            ))}
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                            <span>Sincronizado con el sistema académico</span>
+                            <span className="font-semibold text-[#315d7a]">Asistencia controlada</span>
                         </div>
                     </article>
 
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div>
-                            <h2 className="text-base font-bold text-slate-900">
-                                Accesos rápidos
+                    {/* SECCIÓN ACCESOS RÁPIDOS */}
+                    <article className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
+                        <div className="pb-4 border-b border-slate-100">
+                            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <Icon name="sparkles" className="h-5 w-5 text-[#315d7a]" />
+                                <span>Accesos rápidos</span>
                             </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Ingresa a tus principales servicios.
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                Directo a tus servicios y funciones principales.
                             </p>
                         </div>
 
-                        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1">
                             {quickAccess.map((item) => {
                                 const exists = routeExists(item.routeName);
 
@@ -347,28 +359,28 @@ export default function EstudianteDashboard() {
                                         key={item.label}
                                         href={routeHref(item.routeName)}
                                         className={[
-                                            'group flex items-center gap-4 rounded-xl border border-slate-200 p-4 transition',
+                                            'group flex items-center gap-3.5 rounded-xl border border-slate-200/80 p-3.5 transition-all',
                                             exists
-                                                ? 'hover:border-[#b9ccd8] hover:bg-[#f8fafc]'
+                                                ? 'hover:border-[#315d7a]/50 hover:bg-slate-50/80 hover:shadow-2xs'
                                                 : 'pointer-events-none opacity-50',
                                         ].join(' ')}
                                     >
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
+                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.bg}`}>
                                             <Icon name={item.icon} className="h-5 w-5" />
                                         </div>
 
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold text-slate-900">
+                                            <p className="truncate text-xs font-bold text-slate-900 group-hover:text-[#315d7a] transition">
                                                 {item.label}
                                             </p>
-                                            <p className="mt-1 text-xs text-slate-500">
+                                            <p className="mt-0.5 truncate text-[11px] text-slate-500">
                                                 {item.description}
                                             </p>
                                         </div>
 
                                         <Icon
                                             name="arrowRight"
-                                            className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#315d7a]"
+                                            className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#315d7a]"
                                         />
                                     </Link>
                                 );
@@ -377,80 +389,50 @@ export default function EstudianteDashboard() {
                     </article>
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-2">
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    Actividad académica
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Próximas tareas y evaluaciones.
-                                </p>
-                            </div>
-
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
-                                <Icon name="book" className="h-5 w-5" />
-                            </div>
-                        </div>
-
-                        <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                            <Icon
-                                name="alert"
-                                className="mx-auto h-8 w-8 text-slate-400"
-                            />
-                            <p className="mt-3 text-sm font-semibold text-slate-700">
-                                Sin actividades cargadas
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Las tareas y evaluaciones aparecerán cuando se conecten los módulos académicos.
+                {/* COMUNICADOS Y ANUNCIOS */}
+                <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                        <div>
+                            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <Icon name="bell" className="h-5 w-5 text-[#315d7a]" />
+                                <span>Anuncios y Comunicados Institucionales</span>
+                            </h2>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                Novedades y avisos publicados para tu programa de estudios.
                             </p>
                         </div>
-                    </article>
+                    </div>
 
-                    <article className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    Anuncios
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Comunicados y novedades institucionales.
-                                </p>
-                            </div>
-
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eaf1f6] text-[#315d7a]">
-                                <Icon name="bell" className="h-5 w-5" />
-                            </div>
-                        </div>
-
-                        <div className="mt-5 divide-y divide-slate-100">
-                            {announcements.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
-                                >
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                                        <Icon name="file" className="h-4 w-4" />
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {item.title}
-                                        </p>
-                                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                    <div className="mt-4">
+                        {announcements.length > 0 ? (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {announcements.map((item, index) => (
+                                    <div
+                                        key={index}
+                                        className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 hover:bg-white hover:border-[#315d7a]/30 transition"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <h3 className="text-xs font-bold text-slate-900 leading-snug">
+                                                {item.title}
+                                            </h3>
+                                            <span className="text-[10px] font-semibold text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shrink-0">
+                                                {item.date}
+                                            </span>
+                                        </div>
+                                        <p className="mt-2 text-xs text-slate-600 line-clamp-2 leading-relaxed">
                                             {item.detail}
                                         </p>
                                     </div>
-
-                                    <span className="whitespace-nowrap text-xs text-slate-400">
-                                        {item.date}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </article>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-slate-400 text-xs">
+                                No hay comunicados pendientes en este momento.
+                            </div>
+                        )}
+                    </div>
                 </section>
+
             </div>
         </AuthenticatedLayout>
     );

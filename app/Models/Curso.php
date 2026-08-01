@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Curso extends Model
 {
@@ -59,6 +60,24 @@ class Curso extends Model
             'cursos_plan_estudio',
             'curso_id',
             'plan_estudio_id'
+        );
+    }
+    public function docentes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Docente::class,
+            'cursos_docentes',
+            'curso_id',
+            'docente_id'
+        )->withTimestamps();
+    }
+
+    public function horarios(): HasMany
+    {
+        return $this->hasMany(
+            Horario::class,
+            'id_curso',
+            'id'
         );
     }
 }
