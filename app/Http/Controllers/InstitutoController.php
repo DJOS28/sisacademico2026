@@ -49,6 +49,7 @@ class InstitutoController extends Controller
             'nombre' => trim($datos['nombre']),
             'direccion' => $this->nullable($datos['direccion'] ?? null),
             'telefono' => $this->nullable($datos['telefono'] ?? null),
+            'pagina_web' => $this->nullable($datos['pagina_web'] ?? null),
             'logo' => $logo,
             'codigo_modular' => $this->nullable(
                 $datos['codigo_modular'] ?? null
@@ -94,7 +95,7 @@ class InstitutoController extends Controller
         ]);
     }
 
-    public function update(Request $request,Instituto $instituto): RedirectResponse 
+    public function update(Request $request, Instituto $instituto): RedirectResponse 
     {
         $datos = $this->validar($request, $instituto);
 
@@ -118,6 +119,7 @@ class InstitutoController extends Controller
             'nombre' => trim($datos['nombre']),
             'direccion' => $this->nullable($datos['direccion'] ?? null),
             'telefono' => $this->nullable($datos['telefono'] ?? null),
+            'pagina_web' => $this->nullable($datos['pagina_web'] ?? null),
             'logo' => $logo,
             'codigo_modular' => $this->nullable(
                 $datos['codigo_modular'] ?? null
@@ -144,7 +146,7 @@ class InstitutoController extends Controller
         );
     }
 
-    private function validar(Request $request,?Instituto $instituto = null): array 
+    private function validar(Request $request, ?Instituto $instituto = null): array 
     {
         return $request->validate([
             'nombre' => [
@@ -163,6 +165,12 @@ class InstitutoController extends Controller
                 'nullable',
                 'string',
                 'max:20',
+            ],
+            'pagina_web' => [
+                'nullable',
+                'string',
+                'url',
+                'max:255',
             ],
             'codigo_modular' => [
                 'nullable',

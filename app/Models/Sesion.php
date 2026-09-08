@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\ArchivoCurso;
+
 class Sesion extends Model
 {
     use HasFactory;
@@ -19,6 +20,7 @@ class Sesion extends Model
     protected $fillable = [
         'curso_id',
         'horario_id',
+        'moodle_section_id', // 👈 Campo de enlace con el Aula Virtual
         'fecha',
         'fecha_fin',
         'nombre',

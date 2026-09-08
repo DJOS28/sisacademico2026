@@ -77,12 +77,23 @@ export default function Form({
                 <Field label="Teléfono" error={errors.telefono}>
                     <input className={inputClass} value={data.telefono} onChange={(e) => setData('telefono', e.target.value)} />
                 </Field>
+                <Field label="Página web" error={errors.pagina_web}>
+                    <input
+                        type="url"
+                        placeholder="https://ejemplo.edu.pe"
+                        className={inputClass}
+                        value={data.pagina_web ?? ''}
+                        onChange={(e) => setData('pagina_web', e.target.value)}
+                    />
+                </Field>
                 <Field label="Dirección" error={errors.direccion}>
                     <input className={inputClass} value={data.direccion} onChange={(e) => setData('direccion', e.target.value)} />
                 </Field>
-                <Field label="Logo" error={errors.logo}>
-                    <input type="file" accept="image/*" className={inputClass} onChange={(e) => setData('logo', e.target.files?.[0] ?? null)} />
-                </Field>
+                <div className="md:col-span-2">
+                    <Field label="Logo" error={errors.logo}>
+                        <input type="file" accept="image/*" className={inputClass} onChange={(e) => setData('logo', e.target.files?.[0] ?? null)} />
+                    </Field>
+                </div>
             </div>
 
             <div className="grid gap-5 md:grid-cols-3">

@@ -17,6 +17,7 @@ class Curso extends Model
         'semestre_id',
         'tipo',
         'id_modulo',
+        'moodle_course_id',
         'creditos',
         'horas_semestrales',
         'orden',

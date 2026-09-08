@@ -37,7 +37,7 @@ export default function Index({ institutos }) {
                 <table className="min-w-full divide-y">
                     <thead className="bg-slate-50">
                         <tr>
-                            {['Nombre', 'Código modular', 'Distrito', 'Provincia', 'Departamento', 'Acciones'].map((h) => (
+                            {['Nombre', 'Código modular', 'Web', 'Distrito', 'Provincia', 'Departamento', 'Acciones'].map((h) => (
                                 <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase text-slate-500">{h}</th>
                             ))}
                         </tr>
@@ -47,6 +47,23 @@ export default function Index({ institutos }) {
                             <tr key={item.id}>
                                 <td className="px-4 py-3 text-sm font-semibold">{item.nombre}</td>
                                 <td className="px-4 py-3 text-sm">{item.codigo_modular}</td>
+                                <td className="px-4 py-3 text-sm">
+                                    {item.pagina_web ? (
+                                        <a
+                                            href={item.pagina_web}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                                        >
+                                            Visitar
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                        </a>
+                                    ) : (
+                                        <span className="text-slate-400">—</span>
+                                    )}
+                                </td>
                                 <td className="px-4 py-3 text-sm">{item.distrito?.Distrito}</td>
                                 <td className="px-4 py-3 text-sm">{item.distrito?.provincia?.Provincia}</td>
                                 <td className="px-4 py-3 text-sm">{item.distrito?.provincia?.departamento?.Departamento}</td>

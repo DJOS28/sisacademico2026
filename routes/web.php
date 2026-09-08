@@ -42,10 +42,75 @@ use App\Http\Controllers\RequisitoController;
 use App\Http\Controllers\TipoPagoController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\InscripcionPublicaController;
+use App\Http\Controllers\ResultadoAdmisionController;
+use App\Http\Controllers\MatriculaIngresanteController;
+use App\Http\Controllers\ReporteMatriculaController;
+use App\Http\Controllers\ConceptoController;
+use App\Http\Controllers\CajaController;
+use App\Http\Controllers\PagoPostulanteController;
+use App\Http\Controllers\ReporteCajaController;
+use App\Http\Controllers\TramiteController;
+use App\Http\Controllers\RequisitoTramiteController;
+use App\Http\Controllers\SolicitudExternaController;
+use App\Http\Controllers\SolicitudTramiteController;
 use Inertia\Inertia;
-
-
+use App\Http\Controllers\Auth\PasswordOtpController;
+use App\Http\Controllers\RepositorioCategoriaController;
+use App\Http\Controllers\RepositorioAutorController;
+use App\Http\Controllers\RepositorioRecursoController;
+use App\Http\Controllers\TitulacionModalidadController;
+use App\Http\Controllers\TitulacionRequisitoController;
+use App\Http\Controllers\TitulacionController;
+use App\Http\Controllers\TitulacionSustentacionController;
+use App\Http\Controllers\TitulacionRegistroController;
+use App\Http\Controllers\PatrimonioCategoriaController;
+use App\Http\Controllers\PatrimonioBienController;
+use App\Http\Controllers\PatrimonioMovimientoController;
+use App\Http\Controllers\PatrimonioMantenimientoController;
+use App\Http\Controllers\PatrimonioBajaController;
+use App\Http\Controllers\PatrimonioReporteController;
+use App\Http\Controllers\MoodleSsoController;
+use App\Http\Controllers\SupervisionDocenteController;
+use App\Http\Controllers\PlanEstudioSupervisorController;
+use App\Http\Controllers\CriterioSubcomponenteController;
+use App\Http\Controllers\AsistenciaDocenteController;
+use App\Http\Controllers\AuditoriaController;
+use App\Http\Controllers\KpiIndicadoresController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AnuncioController;
+
+/*
+|--------------------------------------------------------------------------
+| Rutas públicas — Solicitud de trámite para externos
+|--------------------------------------------------------------------------
+| Sin middleware 'auth': cualquier persona puede acceder sin cuenta.
+| Agregar dentro de routes/web.php, fuera del grupo autenticado.
+*/
+ 
+Route::middleware('guest')->group(function () {
+    Route::get('/recuperar-clave', [PasswordOtpController::class, 'showForgotPassword'])->name('password.otp.show');
+    Route::post('/recuperar-clave/enviar-codigo', [PasswordOtpController::class, 'sendOtp'])->name('password.otp.send');
+    Route::post('/recuperar-clave/validar-codigo', [PasswordOtpController::class, 'verifyOtp'])->name('password.otp.verify');
+    Route::post('/recuperar-clave/cambiar-clave', [PasswordOtpController::class, 'resetPassword'])->name('password.otp.reset');
+});
+
+Route::prefix('solicitud-externa')->group(function () {
+    Route::get('/', [SolicitudExternaController::class, 'create'])
+        ->name('solicitud-externa.create');
+ 
+    Route::post('/', [SolicitudExternaController::class, 'store'])
+        ->name('solicitud-externa.store');
+
+    // Consultas a RENIEC y SUNAT (DeColecta)
+    Route::get('/consultar-dni/{dni}', [SolicitudExternaController::class, 'consultarDni'])->name('solicitud-externa.consultar-dni');
+    Route::get('/consultar-ruc/{ruc}', [SolicitudExternaController::class, 'consultarRuc'])->name('solicitud-externa.consultar-ruc');
+    
+    Route::get('/solicitud-externa/seguimiento/{codigo?}', [SolicitudExternaController::class, 'seguimiento'])
+    ->name('solicitud-externa.seguimiento');
+ 
+   
+});
+ 
 
 // Formulario externo de Inscripción
 Route::get('inscripcion-online/{admision?}', [InscripcionPublicaController::class, 'create'])->name('inscripcion.publica');
@@ -61,6 +126,9 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+
+    Route::get('/aula-virtual/ingresar', [MoodleSsoController::class, 'ingresar'])
+        ->name('moodle.sso');
     /* Perfil */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -77,11 +145,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/docente/cursos/sesiones/{id}', [DocenteController::class, 'updateSesion'])->name('cursos.sesiones.update'); // Usa POST para soportar multipart file upload en updates
     Route::patch('/docente/cursos/sesiones/{id}/toggle', [DocenteController::class, 'toggleSesion'])->name('cursos.sesiones.toggle');
     Route::delete('/docente/cursos/sesiones/{id}', [DocenteController::class, 'destroySesion'])->name('cursos.sesiones.destroy');
+    Route::post('/cursos/sesiones/generar-automatico', [DocenteController::class, 'generarSesionesAutomaticas'])->name('cursos.sesiones.generar-automatico');
     
     // Asistencias
     Route::get('/docente/cursos/asistencias/sesion/{sesionId}', [DocenteController::class, 'getAsistenciasPorSesion'])->name('cursos.asistencias.obtener');
     Route::post('/docente/cursos/asistencias/guardar', [DocenteController::class, 'guardarAsistencia'])->name('cursos.asistencias.guardar');
     Route::get('/docente/cursos/gestionar/asistencias/pdf', [DocenteController::class, 'generarPdfReporte'])->name('cursos.asistencias.pdf');
+
+
+    // ==========================================
+    // MÓDULO INDEPENDIENTE: CONTROL DE ASISTENCIAS
+    // ==========================================
+    Route::get('/docente/asistencias', [AsistenciaDocenteController::class, 'index'])->name('docente.asistencias.index');
+    Route::post('/docente/asistencias/select', [AsistenciaDocenteController::class, 'setContext'])->name('docente.asistencias.select');
+    Route::get('/docente/asistencias/matriz', [AsistenciaDocenteController::class, 'getMatriz'])->name('docente.asistencias.matriz');
+    Route::post('/docente/asistencias/guardar', [AsistenciaDocenteController::class, 'guardar'])->name('docente.asistencias.guardar');
+    Route::get('/docente/asistencias/pdf', [AsistenciaDocenteController::class, 'generarPdfReporte'])->name('docente.asistencias.pdf');
+
+    
     // Materiales del Curso
     Route::post('/docente/cursos/materiales', [DocenteController::class, 'storeMaterial'])->name('cursos.materiales.store');
     Route::post('/docente/cursos/materiales/{id}', [DocenteController::class, 'updateMaterial'])->name('cursos.materiales.update');
@@ -95,10 +176,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/docente/cursos/gestionar/notas/pdf', [NotasController::class, 'generarPdfReporte'])->name('cursos.notas.pdf');
     Route::post('/docente/cursos/matriz-notas', [NotasController::class, 'guardarNotasMatriz'])->name('cursos.notas.guardar');
 
+    // Rutas de integración con Moodle
+    Route::get('/evaluaciones/moodle/disponibles', [NotasController::class, 'listarEvaluacionesMoodle'])->name('evaluaciones.moodle.disponibles');
+    Route::post('/notas/importar-moodle', [NotasController::class, 'importarNotasMoodle'])->name('notas.importar.moodle');
+
     // Rutas de Clases en Vivo (Módulo Docente)
     Route::get('docente/cursos/clases-en-vivo/obtener', [ClaseEnVivoController::class, 'index'])->middleware('auth')->name('cursos.clases.index');
     Route::post('docente/cursos/clases-en-vivo/crear', [ClaseEnVivoController::class, 'store'])->middleware('auth')->name('cursos.clases.store');
     Route::post('docente/cursos/clases-en-vivo/{id}/estado', [ClaseEnVivoController::class, 'cambiarEstado'])->middleware('auth')->name('cursos.clases.estado');
+    Route::patch('docente/cursos/clases-en-vivo/{id}/grabacion', [ClaseEnVivoController::class, 'registrarGrabacion'])->middleware('auth')->name('cursos.clases.grabacion');
     Route::delete('docente/cursos/clases-en-vivo/{id}', [ClaseEnVivoController::class, 'destroy'])->middleware('auth')->name('cursos.clases.destroy');
 
     
@@ -134,6 +220,16 @@ Route::middleware('auth')->group(function () {
 
     Route::delete('/docente/subcomponentes/{subcomponente}', [LogroCursoController::class, 'destroySubcomponente'])->name('subcomponentes.destroy');
 
+
+    Route::get('/docente/registro-auxiliar', [DocenteController::class, 'registroAuxiliarIndex'])
+        ->name('docente.registro-auxiliar');
+        
+    Route::post('/docente/registro-auxiliar/seleccionar', [DocenteController::class, 'setRegistroAuxiliarContext'])
+        ->name('docente.registro-auxiliar.select');
+
+        // Importación de Excel por Backend
+    Route::post('/registro-auxiliar/importar-excel', [DocenteController::class, 'importarNotasLogroExcel'])->name('registro-auxiliar.importar-excel');
+
     // Rutas del perfil del estudiante (individuales sin Route::group)
     Route::get('/estudiante/mis-cursos', [EstudianteCursoController::class, 'misCursos'])->middleware(['auth'])->name('estudiante.cursos');
     Route::get('/estudiante/mi-horario', [EstudianteCursoController::class, 'miHorario'])->middleware(['auth'])->name('estudiante.horario');
@@ -148,20 +244,44 @@ Route::middleware('auth')->group(function () {
     Route::get('/estudiante/perfil', [EstudianteCursoController::class, 'editarPerfil'])->name('estudiante.perfil.edit');
     Route::put('/estudiante/perfil', [EstudianteCursoController::class, 'actualizarPerfil'])->name('estudiante.perfil.update');
 
+    // Rutas de Trámites para Estudiantes
+    Route::get('/estudiante/mis-tramites', [EstudianteCursoController::class, 'misTramites'])->name('estudiante.tramites');
+
+    Route::post('/estudiante/mis-tramites', [EstudianteCursoController::class, 'guardarTramiteEstudiante'])->name('estudiante.tramites.store');
+
+    // ...
+    Route::get('/estudiante/bolsa-laboral', [EstudianteCursoController::class, 'bolsaLaboral'])->name('estudiante.bolsa-laboral');
+
+    Route::post('/estudiante/bolsa-laboral/postular', [EstudianteCursoController::class, 'postularOferta'])->name('estudiante.bolsa-laboral.postular');
+
+        // ...
+    Route::get('/estudiante/mis-pagos', [EstudianteCursoController::class, 'misPagos'])->name('estudiante.pagos');
+
     /* Docentes */
     // Ruta de Gestión del Curso
     Route::get('/docente/horarios', [DocenteController::class, 'horarios'])->name('docente.horarios');
+    
+    Route::get('docente/mi-perfil', [DocenteController::class, 'miPerfil'])->middleware('auth')->name('docente.perfil');
+    Route::get('docente/mi-horario/pdf', [DocenteController::class, 'imprimirHorarioPdf'])->middleware('auth')->name('docente.horarios.pdf');
     Route::match(['get', 'post'], '/docente/cursos/gestionar', [DocenteController::class, 'gestionar'])->name('cursos.gestionar');
     Route::match(['get', 'post'], '/docente/mis-cursos', [DocenteController::class, 'misCursos'])->name('docente.cursos');
     Route::post('/docentes/buscar', [DocenteController::class, 'buscar'])->name('docentes.buscar');
+    Route::post('docentes/importar-masivo', [DocenteController::class, 'importarMasivo'])->middleware('auth')->name('docentes.importar');
+    Route::get('docentes/plantilla-excel', [DocenteController::class, 'descargarPlantillaExcel'])->middleware('auth')->name('docentes.plantilla.excel');
+    Route::post('docentes/consultar-dni', [DocenteController::class, 'consultarDni'])->middleware('auth')->name('docentes.consultar.dni');
     Route::resource('docentes', DocenteController::class);
 
-    /* Administradores */
+   /* Administradores - Rutas explícitas */
+    Route::get('/administradores', [AdministradorController::class, 'index'])->name('administradores.index');
+    Route::get('/administradores/create', [AdministradorController::class, 'create'])->name('administradores.create');
+    Route::post('/administradores', [AdministradorController::class, 'store'])->name('administradores.store');
+    Route::get('/administradores/{administrador}/edit', [AdministradorController::class, 'edit'])->name('administradores.edit');
+    Route::put('/administradores/{administrador}', [AdministradorController::class, 'update'])->name('administradores.update');
     Route::put('/administradores/{administrador}/estado', [AdministradorController::class, 'actualizarEstado'])->name('administradores.estado');
-    Route::resource('administradores', AdministradorController::class)->except('show');
 
     /* Personal */
     Route::put('/personal/{personal}/estado', [PersonalController::class, 'actualizarEstado'])->name('personal.estado');
+    Route::get('/personal/buscar', [PersonalController::class, 'buscarAjax'])->name('personal.buscar');
     Route::resource('personal', PersonalController::class)->except('show');
 
     /* Usuarios: rutas específicas antes de la ruta dinámica */
@@ -272,7 +392,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('roles',RolController::class)->parameters(['roles' => 'rol',])->except(['show',]);
 
     /*Estudiantes*/
-
+    Route::get('/estudiantes/descargar-plantilla', [EstudianteController::class, 'descargarPlantilla'])->name('estudiantes.descargar.plantilla');
+    Route::post('/estudiantes/importar-masivo', [EstudianteController::class, 'importarMasivo'])->name('estudiantes.importar.masivo');
+    Route::post('/estudiantes/importar-masivo', [EstudianteController::class, 'importarMasivo'])->name('estudiantes.importar.masivo');
+    Route::post('/estudiantes/consultar-dni', [EstudianteController::class, 'consultarDni'])->name('estudiantes.consultar.dni');
     Route::post('/estudiantes/filtrar',[EstudianteController::class, 'filtrar'])->name('estudiantes.filtrar');
     Route::post('estudiantes/importar', [EstudianteController::class, 'importarExcel'])->name('estudiantes.importar');
 
@@ -284,6 +407,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/matriculas/verificar-estudiante', [MatriculaController::class, 'verificarMatriculaEstudiante'])->name('matriculas.verificar_estudiante');
     Route::get('/matriculas/{id}/ficha', [MatriculaController::class, 'verFicha'])->name('matriculas.ficha');
+
+    Route::post('/matriculas/importar-masivo', [MatriculaController::class, 'importarMasivo'])
+    ->name('matriculas.importar_masivo');
 
     // Rutas CRUD estándar para Matrículas
     Route::resource('matriculas', MatriculaController::class);
@@ -333,6 +459,306 @@ Route::middleware('auth')->group(function () {
     Route::patch('inscripciones/{inscripcion}/estado', [InscripcionController::class, 'cambiarEstado'])->name('inscripciones.cambiar-estado');
     Route::resource('inscripciones', InscripcionController::class)->parameters(['inscripciones' => 'inscripcion',]);
 
+    //resultados
+    Route::get('/resultados-admision/descargar-plantilla', [ResultadoAdmisionController::class, 'descargarPlantilla'])
+    ->name('resultados-admision.plantilla');
+
+    Route::post('/resultados-admision/importar', [ResultadoAdmisionController::class, 'importar'])
+    ->name('resultados-admision.importar');
+    Route::resource('resultados-admision', ResultadoAdmisionController::class)->parameters(['resultados-admision' => 'resultadoAdmision']);
+
+    // Vista principal (Carga limpia)
+    Route::get('/matriculas-ingresantes', [MatriculaIngresanteController::class, 'index'])->name('matriculas.ingresantes.index');
+
+    // Endpoint AJAX para obtener los ingresantes y las secciones activas del 1er Semestre
+    Route::get('/api/matriculas-ingresantes/obtener-datos', [MatriculaIngresanteController::class, 'obtenerDatosAjax'])->name('matriculas.ingresantes.ajax');
+
+    // Procesamiento de matrícula masiva
+    Route::post('/matriculas-ingresantes', [MatriculaIngresanteController::class, 'store'])->name('matriculas.ingresantes.store');
+
+    // Vista Malla Curricular
+    Route::get('/planes/malla-curricular', [PlanEstudioController::class, 'malla'])->name('planes.malla');
+    Route::post('/planes/malla-curricular/obtener', [PlanEstudioController::class, 'obtenerMallaAjax'])->name('planes.malla.ajax');
+    Route::get('/planes/malla-curricular/pdf/{plan_id}', [PlanEstudioController::class, 'generarPdfMalla'])->name('planes.malla.pdf');
+
+    // Vista de Reportes
+    Route::get('/reportes/matriculados', [ReporteMatriculaController::class, 'index'])
+        ->name('reportes.matriculados');
+
+    Route::get('/api/reportes/matriculados/obtener', [ReporteMatriculaController::class, 'obtenerMatriculadosAjax'])
+        ->name('reportes.matriculados.ajax');
+
+    Route::post('/reportes/matriculados/pdf', [ReporteMatriculaController::class, 'verPdf'])
+        ->name('reportes.matriculados.pdf');
+
+    //conceptos    
+
+    Route::get('/conceptos', [ConceptoController::class, 'index'])->name('conceptos.index');
+    Route::post('/conceptos', [ConceptoController::class, 'store'])->name('conceptos.store');
+    Route::put('/conceptos/{id}', [ConceptoController::class, 'update'])->name('conceptos.update');
+    Route::delete('/conceptos/{id}', [ConceptoController::class, 'destroy'])->name('conceptos.destroy');
+    Route::post('/conceptos/importar', [ConceptoController::class, 'importarExcel'])->name('conceptos.importar');
+
+    // Módulo de Caja
+    Route::get('/caja', [CajaController::class, 'index'])->name('caja.index');
+    Route::post('/caja/aperturar', [CajaController::class, 'aperturar'])->name('caja.aperturar');
+    Route::post('/caja/cerrar', [CajaController::class, 'cerrar'])->name('caja.cerrar');
+    Route::post('/caja/transaccion', [CajaController::class, 'registrarTransaccion'])->name('caja.transaccion');
+    Route::delete('/caja/transaccion/{id}', [CajaController::class, 'anularTransaccion'])->name('caja.anular');
+
+    // Cobros a Postulantes / Estudiantes
+    Route::get('/pagos', [PagoPostulanteController::class, 'index'])->name('pagos.index');
+    Route::get('/pagos/nuevo', [PagoPostulanteController::class, 'create'])->name('pagos.create');
+    Route::get('/pagos/buscar-postulante', [PagoPostulanteController::class, 'buscarPostulante'])->name('pagos.buscar');
+    Route::post('/pagos', [PagoPostulanteController::class, 'store'])->name('pagos.store');
+    Route::delete('/pagos/{id}/anular', [PagoPostulanteController::class, 'anular'])->name('pagos.anular');
+    Route::post('/pagos/{id}/ticket', [PagoPostulanteController::class, 'generarTicket'])->name('pagos.ticket');
+
+    // Módulo de Reportes e Historial de Cajas
+    Route::get('/reportes/cajas', [ReporteCajaController::class, 'index'])->name('reportes.cajas.index');
+    Route::get('/reportes/cajas/{id}', [ReporteCajaController::class, 'detalleCaja'])->name('reportes.cajas.detalle');
+    Route::post('/reportes/cajas/{id}/pdf', [ReporteCajaController::class, 'pdfCuadreCaja'])->name('reportes.cajas.pdf');
+
+     
+    // 1. Recepción principal de Mesa de Partes
+    Route::get('/mesa-de-partes/recepcion', [SolicitudTramiteController::class, 'bandejaMesaPartes'])
+        ->name('mesa-partes.bandeja');
+
+    // 2. Bandeja de Atención por Área (Secretaría Académica, Tesorería, etc.)
+    Route::get('/tramites/bandeja-area', [SolicitudTramiteController::class, 'porMiArea'])
+        ->name('solicitudes.area.index');
+
+    // 3. Mis solicitudes asignadas
+    Route::get('/tramites/mis-asignadas', [SolicitudTramiteController::class, 'misAsignadas'])
+        ->name('solicitudes.mis-asignadas');
+
+    // 4. Tomar / Asignarse expediente
+    Route::post('/tramites/{solicitud}/asignarme', [SolicitudTramiteController::class, 'asignarme'])
+        ->name('solicitudes.asignarme');
+
+    // 5. Derivar expediente
+    Route::post('/tramites/{solicitud}/derivar', [SolicitudTramiteController::class, 'derivar'])
+        ->name('solicitudes.derivar');
+
+    // 6. Resolver / Atender expediente
+    Route::put('/tramites/{solicitud}/atender', [SolicitudTramiteController::class, 'resolver'])
+        ->name('solicitudes.atender');
+
+    // 7. Seguimiento / Expedientes general
+    Route::get('/expedientes', [SolicitudTramiteController::class, 'expedientesIndex'])
+        ->name('expedientes.index');
+
+
+        // Aceptar solicitud externa y enviar correo con código de seguimiento
+    Route::post('/mesa-de-partes/aceptar/{id}', [SolicitudExternaController::class, 'aceptarMesaPartes'])
+        ->name('solicitud-externa.aceptar-mesa-partes');
+
+
+    //tramite documentario
+    Route::get('/requisitos-tramite', [RequisitoTramiteController::class, 'index'])->name('requisitos-tramite.index');
+ 
+    Route::post('/requisitos-tramite', [RequisitoTramiteController::class, 'store'])->name('requisitos-tramite.store');
+ 
+    Route::put('/requisitos-tramite/{requisitosTramite}', [RequisitoTramiteController::class, 'update'])->name('requisitos-tramite.update');
+ 
+    Route::put('/requisitos-tramite/{requisitosTramite}/estado', [RequisitoTramiteController::class, 'cambiarEstado'])->name('requisitos-tramite.estado');
+ 
+    Route::delete('/requisitos-tramite/{requisitosTramite}', [RequisitoTramiteController::class, 'destroy'])->name('requisitos-tramite.destroy');
+
+      Route::get('/tramites', [TramiteController::class, 'index'])->name('tramites.index');
+ 
+    Route::get('/tramites/create', [TramiteController::class, 'create'])->name('tramites.create');
+ 
+    Route::post('/tramites', [TramiteController::class, 'store'])->name('tramites.store');
+ 
+    Route::get('/tramites/{tramite}/edit', [TramiteController::class, 'edit'])->name('tramites.edit');
+ 
+    Route::get('/tramites/{tramite}', [TramiteController::class, 'show'])->name('tramites.show');
+ 
+    Route::put('/tramites/{tramite}', [TramiteController::class, 'update'])->name('tramites.update');
+ 
+    Route::put('/tramites/{tramite}/estado', [TramiteController::class, 'cambiarEstado'])->name('tramites.estado');
+ 
+    Route::delete('/tramites/{tramite}', [TramiteController::class, 'destroy'])->name('tramites.destroy');
+
+
+    /* Repositorio - Categorías */
+    Route::get('/repositorio/categorias', [RepositorioCategoriaController::class, 'index'])->name('repositorio-categorias.index');
+    Route::post('/repositorio/categorias/filtrar', [RepositorioCategoriaController::class, 'filtrar'])->name('repositorio-categorias.filtrar');
+    Route::post('/repositorio/categorias', [RepositorioCategoriaController::class, 'store'])->name('repositorio-categorias.store');
+    Route::put('/repositorio/categorias/{categoria}', [RepositorioCategoriaController::class, 'update'])->name('repositorio-categorias.update');
+    Route::patch('/repositorio/categorias/{categoria}/estado', [RepositorioCategoriaController::class, 'actualizarEstado'])->name('repositorio-categorias.estado');
+    Route::delete('/repositorio/categorias/{categoria}', [RepositorioCategoriaController::class, 'destroy'])->name('repositorio-categorias.destroy');
+
+    /* Repositorio - Autores */
+    Route::get('/repositorio/autores', [RepositorioAutorController::class, 'index'])->name('repositorio-autores.index');
+    Route::post('/repositorio/autores/filtrar', [RepositorioAutorController::class, 'filtrar'])->name('repositorio-autores.filtrar');
+    Route::post('/repositorio/autores', [RepositorioAutorController::class, 'store'])->name('repositorio-autores.store');
+    Route::put('/repositorio/autores/{autor}', [RepositorioAutorController::class, 'update'])->name('repositorio-autores.update');
+    Route::patch('/repositorio/autores/{autor}/estado', [RepositorioAutorController::class, 'actualizarEstado'])->name('repositorio-autores.estado');
+    Route::delete('/repositorio/autores/{autor}', [RepositorioAutorController::class, 'destroy'])->name('repositorio-autores.destroy');
+
+    /* Repositorio - Recursos / Documentos */
+    Route::get('/repositorio/recursos', [RepositorioRecursoController::class, 'index'])->name('repositorio-recursos.index');
+    Route::post('/repositorio/recursos/filtrar', [RepositorioRecursoController::class, 'filtrar'])->name('repositorio-recursos.filtrar');
+    Route::post('/repositorio/recursos', [RepositorioRecursoController::class, 'store'])->name('repositorio-recursos.store');
+    Route::post('/repositorio/recursos/{recurso}', [RepositorioRecursoController::class, 'update'])->name('repositorio-recursos.update');
+    Route::patch('/repositorio/recursos/{recurso}/estado', [RepositorioRecursoController::class, 'actualizarEstado'])->name('repositorio-recursos.estado');
+    Route::delete('/repositorio/recursos/{recurso}', [RepositorioRecursoController::class, 'destroy'])->name('repositorio-recursos.destroy');
+    Route::get('/repositorio/recursos/{recurso}/ver', [RepositorioRecursoController::class, 'verArchivo'])->name('repositorio-recursos.ver');
+    Route::get('/repositorio/recursos/{recurso}/descargar', [RepositorioRecursoController::class, 'descargarArchivo'])->name('repositorio-recursos.descargar');
+
+    Route::get('/repositorio/dashboard', [RepositorioRecursoController::class, 'dashboard'])->name('repositorio.dashboard');
+
+
+    /* Titulación - Modalidades */
+    Route::get('/titulacion/modalidades', [TitulacionModalidadController::class, 'index'])->name('titulacion-modalidades.index');
+    Route::post('/titulacion/modalidades/filtrar', [TitulacionModalidadController::class, 'filtrar'])->name('titulacion-modalidades.filtrar');
+    Route::post('/titulacion/modalidades', [TitulacionModalidadController::class, 'store'])->name('titulacion-modalidades.store');
+    Route::put('/titulacion/modalidades/{modalidad}', [TitulacionModalidadController::class, 'update'])->name('titulacion-modalidades.update');
+    Route::patch('/titulacion/modalidades/{modalidad}/estado', [TitulacionModalidadController::class, 'actualizarEstado'])->name('titulacion-modalidades.estado');
+    Route::delete('/titulacion/modalidades/{modalidad}', [TitulacionModalidadController::class, 'destroy'])->name('titulacion-modalidades.destroy');
+
+    /* Titulación - Requisitos */
+    Route::get('/titulacion/requisitos', [TitulacionRequisitoController::class, 'index'])->name('titulacion-requisitos.index');
+    Route::post('/titulacion/requisitos/filtrar', [TitulacionRequisitoController::class, 'filtrar'])->name('titulacion-requisitos.filtrar');
+    Route::post('/titulacion/requisitos', [TitulacionRequisitoController::class, 'store'])->name('titulacion-requisitos.store');
+    Route::put('/titulacion/requisitos/{requisito}', [TitulacionRequisitoController::class, 'update'])->name('titulacion-requisitos.update');
+    Route::patch('/titulacion/requisitos/{requisito}/estado', [TitulacionRequisitoController::class, 'actualizarEstado'])->name('titulacion-requisitos.estado');
+    Route::patch('/titulacion/requisitos/{requisito}/obligatorio', [TitulacionRequisitoController::class, 'toggleObligatorio'])->name('titulacion-requisitos.obligatorio');
+    Route::delete('/titulacion/requisitos/{requisito}', [TitulacionRequisitoController::class, 'destroy'])->name('titulacion-requisitos.destroy');
+
+    /* Titulación - Expedientes */
+    Route::get('/titulacion/expedientes', [TitulacionController::class, 'index'])->name('titulaciones.index');
+    Route::post('/titulacion/expedientes/filtrar', [TitulacionController::class, 'filtrar'])->name('titulaciones.filtrar');
+    Route::get('/titulacion/expedientes/crear', [TitulacionController::class, 'create'])->name('titulaciones.create');
+    Route::post('/titulacion/expedientes', [TitulacionController::class, 'store'])->name('titulaciones.store');
+    Route::get('/titulacion/expedientes/{titulacion}', [TitulacionController::class, 'show'])->name('titulaciones.show');
+    Route::patch('/titulacion/expedientes/{titulacion}/estado', [TitulacionController::class, 'cambiarEstadoExpediente'])->name('titulaciones.estado');
+    Route::delete('/titulacion/expedientes/{titulacion}', [TitulacionController::class, 'destroy'])->name('titulaciones.destroy');
+
+    /* Requisitos dentro del expediente */
+    Route::post('/titulacion/expedientes/requisitos/{expedienteRequisito}/subir', [TitulacionController::class, 'subirArchivoRequisito'])->name('titulaciones.requisito.subir');
+    Route::patch('/titulacion/expedientes/requisitos/{expedienteRequisito}/evaluar', [TitulacionController::class, 'evaluarRequisito'])->name('titulaciones.requisito.evaluar');
+    Route::get('/titulacion/descargar/{tipo}/{id}', [TitulacionController::class, 'descargarArchivo'])->name('titulaciones.descargar');
+
+    Route::get('/titulacion/expedientes/{titulacion}/editar', [TitulacionController::class, 'edit'])->name('titulaciones.edit');
+    Route::post('/titulacion/expedientes/{titulacion}/actualizar', [TitulacionController::class, 'update'])->name('titulaciones.update');
+
+    /* Titulación - Sustentaciones y Actas */
+    Route::get('/titulacion/sustentaciones', [TitulacionSustentacionController::class, 'index'])->name('titulacion-sustentaciones.index');
+    Route::post('/titulacion/sustentaciones/filtrar', [TitulacionSustentacionController::class, 'filtrar'])->name('titulacion-sustentaciones.filtrar');
+    Route::post('/titulacion/sustentaciones/{titulacion}/guardar', [TitulacionSustentacionController::class, 'guardarSustentacion'])->name('titulacion-sustentaciones.guardar');
+    Route::get('/titulacion/sustentaciones/{titulacion}/acta-pdf', [TitulacionSustentacionController::class, 'emitirActaPdf'])->name('titulacion-sustentaciones.pdf');
+
+    /* Titulación - Libro de Títulos y Registro */
+    Route::get('/titulacion/registro', [TitulacionRegistroController::class, 'index'])->name('titulacion-registro.index');
+    Route::post('/titulacion/registro/filtrar', [TitulacionRegistroController::class, 'filtrar'])->name('titulacion-registro.filtrar');
+    Route::post('/titulacion/registro/{titulacion}/diploma', [TitulacionRegistroController::class, 'registrarDiploma'])->name('titulacion-registro.diploma');
+    Route::get('/titulacion/registro/{titulacion}/constancia-pdf', [TitulacionRegistroController::class, 'emitirConstanciaPdf'])->name('titulacion-registro.pdf');
+
+    /* Patrimonio - Categorías */
+    Route::get('/patrimonio/categorias', [PatrimonioCategoriaController::class, 'index'])->name('patrimonio-categorias.index');
+    Route::post('/patrimonio/categorias/filtrar', [PatrimonioCategoriaController::class, 'filtrar'])->name('patrimonio-categorias.filtrar');
+    Route::post('/patrimonio/categorias', [PatrimonioCategoriaController::class, 'store'])->name('patrimonio-categorias.store');
+    Route::put('/patrimonio/categorias/{categoria}', [PatrimonioCategoriaController::class, 'update'])->name('patrimonio-categorias.update');
+    Route::patch('/patrimonio/categorias/{categoria}/estado', [PatrimonioCategoriaController::class, 'actualizarEstado'])->name('patrimonio-categorias.estado');
+    Route::delete('/patrimonio/categorias/{categoria}', [PatrimonioCategoriaController::class, 'destroy'])->name('patrimonio-categorias.destroy');
+
+    /* Patrimonio - Inventario de Bienes */
+    Route::get('/patrimonio/bienes', [PatrimonioBienController::class, 'index'])->name('patrimonio-bienes.index');
+    Route::post('/patrimonio/bienes/filtrar', [PatrimonioBienController::class, 'filtrar'])->name('patrimonio-bienes.filtrar');
+    Route::post('/patrimonio/bienes', [PatrimonioBienController::class, 'store'])->name('patrimonio-bienes.store');
+    Route::post('/patrimonio/bienes/{biene}', [PatrimonioBienController::class, 'update'])->name('patrimonio-bienes.update');
+    Route::delete('/patrimonio/bienes/{biene}', [PatrimonioBienController::class, 'destroy'])->name('patrimonio-bienes.destroy');
+
+    /* Patrimonio - Movimientos y Asignaciones */
+    Route::get('/patrimonio/movimientos', [PatrimonioMovimientoController::class, 'index'])->name('patrimonio-movimientos.index');
+    Route::post('/patrimonio/movimientos/filtrar', [PatrimonioMovimientoController::class, 'filtrar'])->name('patrimonio-movimientos.filtrar');
+    Route::post('/patrimonio/movimientos', [PatrimonioMovimientoController::class, 'store'])->name('patrimonio-movimientos.store');
+    Route::delete('/patrimonio/movimientos/{movimiento}', [PatrimonioMovimientoController::class, 'destroy'])->name('patrimonio-movimientos.destroy');
+
+    /* Patrimonio - Mantenimientos */
+    Route::get('/patrimonio/mantenimientos', [PatrimonioMantenimientoController::class, 'index'])->name('patrimonio-mantenimientos.index');
+    Route::post('/patrimonio/mantenimientos/filtrar', [PatrimonioMantenimientoController::class, 'filtrar'])->name('patrimonio-mantenimientos.filtrar');
+    Route::post('/patrimonio/mantenimientos', [PatrimonioMantenimientoController::class, 'store'])->name('patrimonio-mantenimientos.store');
+    Route::put('/patrimonio/mantenimientos/{mantenimiento}', [PatrimonioMantenimientoController::class, 'update'])->name('patrimonio-mantenimientos.update');
+    Route::delete('/patrimonio/mantenimientos/{mantenimiento}', [PatrimonioMantenimientoController::class, 'destroy'])->name('patrimonio-mantenimientos.destroy');
+
+    /* Patrimonio - Bajas de Inventario */
+    Route::get('/patrimonio/bajas', [PatrimonioBajaController::class, 'index'])->name('patrimonio-bajas.index');
+    Route::post('/patrimonio/bajas/filtrar', [PatrimonioBajaController::class, 'filtrar'])->name('patrimonio-bajas.filtrar');
+    Route::post('/patrimonio/bajas', [PatrimonioBajaController::class, 'store'])->name('patrimonio-bajas.store');
+    Route::delete('/patrimonio/bajas/{baja}', [PatrimonioBajaController::class, 'destroy'])->name('patrimonio-bajas.destroy');
+    Route::get('/patrimonio/bajas/{baja}/acta-pdf', [PatrimonioBajaController::class, 'emitirActaPdf'])->name('patrimonio-bajas.pdf');
+
+    /* Patrimonio - Reportes y Códigos */
+    Route::get('/patrimonio/reportes', [PatrimonioReporteController::class, 'dashboard'])->name('patrimonio.dashboard');
+    Route::get('/patrimonio/reportes/etiquetas-pdf', [PatrimonioReporteController::class, 'imprimirEtiquetas'])->name('patrimonio.reportes.etiquetas');
+    Route::get('/patrimonio/reportes/inventario-pdf', [PatrimonioReporteController::class, 'reporteInventarioPdf'])->name('patrimonio.reportes.inventario');
+
+    // 1. Módulo de Supervisión / Monitoreo Docente
+    Route::get('/supervision/docentes', [SupervisionDocenteController::class, 'index'])->name('supervision.index');
+    Route::get('/supervision/filtrar', [SupervisionDocenteController::class, 'filtrar'])->name('supervision.filtrar');
+    Route::get('/supervision/historial-curso/{horarioId}', [SupervisionDocenteController::class, 'historialCurso'])->name('supervision.historial.curso');
+    Route::post('/supervision/guardar', [SupervisionDocenteController::class, 'store'])->name('supervision.store');
+    Route::get('/supervision/detalles-curso/{horarioId}', [SupervisionDocenteController::class, 'detallesCurso'])->name('supervision.detalles.curso');
+
+    // 2. Módulo de Asignación de Supervisores por Plan de Estudio
+    Route::get('/supervision/planes', [PlanEstudioSupervisorController::class, 'index'])->name('supervision.planes.index');
+    Route::post('/supervision/planes/asignar', [PlanEstudioSupervisorController::class, 'store'])->name('supervision.planes.store');
+    Route::patch('/supervision/planes/{id}/toggle', [PlanEstudioSupervisorController::class, 'toggleEstado'])->name('supervision.planes.toggle');
+    Route::delete('/supervision/planes/{id}', [PlanEstudioSupervisorController::class, 'destroy'])->name('supervision.planes.destroy');
+
+
+    // ==========================================
+    // RUTAS: CRITERIOS Y ESTRUCTURA OFICIAL MINEDU
+    // ==========================================
+    // Listar criterios de un subcomponente/dimensión
+    Route::get('/criterios/subcomponente/{subcomponenteId}', [CriterioSubcomponenteController::class, 'index'])->name('criterios.index');
+    
+    // Crear un criterio manual
+    Route::post('/criterios', [CriterioSubcomponenteController::class, 'store'])->name('criterios.store');
+    
+    // Actualizar un criterio
+    Route::put('/criterios/{id}', [CriterioSubcomponenteController::class, 'update'])->name('criterios.update');
+    
+    // Eliminar un criterio
+    Route::delete('/criterios/{id}', [CriterioSubcomponenteController::class, 'destroy'])->name('criterios.destroy');
+    
+    // Autogenerar C1, C2, C3, C4 para un subcomponente individual
+    Route::post('/criterios/generar-defecto/{subcomponenteId}', [CriterioSubcomponenteController::class, 'generarCriteriosDefecto'])->name('criterios.generar_defecto');
+    
+    // Generar la estructura oficial completa a un Logro (Actitudinal, Conceptual y Procedimental con C1-C4)
+    Route::post('/logros/{id}/generar-estructura-oficial', [CriterioSubcomponenteController::class, 'generarEstructuraOficial'])->name('logros.generar_oficial');
+
+    // ==========================================
+    // RUTAS: MATRIZ Y REGISTRO DE CALIFICACIONES
+    // ==========================================
+    // Para NotasTab (dentro de Gestionar Curso)
+    Route::get('/docente/cursos/notas/matriz', [NotasController::class, 'getMatrizNotas'])->name('cursos.notas.matriz');
+    Route::post('/docente/cursos/notas/guardar', [NotasController::class, 'guardarNotasMatriz'])->name('cursos.notas.guardar');
+
+    // Para la vista independiente del Registro Auxiliar (Excel MINEDU)
+    Route::get('/docente/registro-auxiliar/matriz', [NotasController::class, 'getMatrizRegistroAuxiliar'])->name('docente.registro-auxiliar.matriz');
+    Route::post('/docente/registro-auxiliar/guardar', [NotasController::class, 'guardarRegistroAuxiliar'])->name('docente.registro-auxiliar.guardar');
+
+    Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
+    Route::get('/auditoria/exportar', [AuditoriaController::class, 'exportar'])->name('auditoria.exportar');
+
+
+    Route::get('/reportes/indicadores', [KpiIndicadoresController::class, 'index'])->name('reportes.kpi.index');
+    Route::post('/reportes/indicadores/data', [KpiIndicadoresController::class, 'obtenerDataAjax'])->name('reportes.kpi.data');
+    Route::get('/reportes/indicadores/exportar', [KpiIndicadoresController::class, 'exportar'])->name('reportes.kpi.exportar');
+
+
+    Route::get('/anuncios', [AnuncioController::class, 'index'])->name('anuncios.index');
+    Route::post('/anuncios/filtrar', [AnuncioController::class, 'filtrar'])->name('anuncios.filtrar');
+    Route::post('/anuncios', [AnuncioController::class, 'store'])->name('anuncios.store');
+    Route::put('/anuncios/{anuncio}', [AnuncioController::class, 'update'])->name('anuncios.update');
+    Route::patch('/anuncios/{anuncio}/toggle-estado', [AnuncioController::class, 'toggleEstado'])->name('anuncios.toggle-estado');
+    Route::delete('/anuncios/{anuncio}', [AnuncioController::class, 'destroy'])->name('anuncios.destroy');
+   
 
     
 

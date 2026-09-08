@@ -38,4 +38,9 @@ class SubcomponenteLogro extends Model
     {
         return $this->hasMany(NotaSubcomponente::class, 'subcomponente_id', 'id');
     }
+
+    public function criterios(): HasMany
+    {
+        return $this->hasMany(CriterioSubcomponente::class, 'subcomponente_id', 'id')->orderBy('orden', 'asc');
+    }
 }

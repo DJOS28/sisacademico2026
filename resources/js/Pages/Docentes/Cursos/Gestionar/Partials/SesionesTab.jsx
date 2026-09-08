@@ -2,26 +2,32 @@ import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 import ModalCrearSesion from './ModalCrearSesion';
+import ModalGenerarSesiones from './ModalGenerarSesiones';
 
-export default function SesionesTab({ sesiones = [] }) {
+export default function SesionesTab({ sesiones = [], periodo = null }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAutoModalOpen, setIsAutoModalOpen] = useState(false);
     const [sesionAEditar, setSesionAEditar] = useState(null);
 
-    // Abrir modal para crear
     const handleCreate = () => {
         setSesionAEditar(null);
         setIsModalOpen(true);
     };
 
-    // Abrir modal para editar
     const handleEdit = (sesion) => {
         setSesionAEditar(sesion);
         setIsModalOpen(true);
     };
 
-    // Alternar estado (Activar / Desactivar) por AJAX con Swal
     const handleToggleStatus = (sesion) => {
         const nuevoEstado = !sesion.activo;
+
+        Swal.fire({
+            title: 'Actualizando estado...',
+            text: 'Sincronizando con el Aula Virtual',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
 
         router.patch(route('cursos.sesiones.toggle', sesion.id_sesion), {}, {
             preserveScroll: true,
@@ -35,23 +41,37 @@ export default function SesionesTab({ sesiones = [] }) {
                     customClass: { popup: 'rounded-2xl' },
                 });
             },
+            onError: () => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cambiar el estado de la sesión.',
+                    customClass: { popup: 'rounded-2xl' },
+                });
+            }
         });
     };
 
-    // Eliminar por AJAX con Confirmación de SweetAlert2
     const handleDelete = (id) => {
         Swal.fire({
             title: '¿Eliminar sesión?',
-            text: 'Esta acción no se puede deshacer y borrará los archivos adjuntos.',
+            text: 'Esta acción borrará la sesión y sus asistencias asociadas.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             cancelButtonColor: '#64748b',
             confirmButtonText: 'Sí, eliminar',
             cancelButtonText: 'Cancelar',
+            reverseButtons: true,
             customClass: { popup: 'rounded-2xl' },
         }).then((result) => {
             if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Eliminando sesión...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading(),
+                });
+
                 router.delete(route('cursos.sesiones.destroy', id), {
                     preserveScroll: true,
                     onSuccess: () => {
@@ -64,6 +84,14 @@ export default function SesionesTab({ sesiones = [] }) {
                             customClass: { popup: 'rounded-2xl' },
                         });
                     },
+                    onError: () => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Ocurrió un inconveniente al intentar eliminar la sesión.',
+                            customClass: { popup: 'rounded-2xl' },
+                        });
+                    }
                 });
             }
         });
@@ -71,23 +99,34 @@ export default function SesionesTab({ sesiones = [] }) {
 
     return (
         <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            {/* Header con botones de acción */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
                     <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                        Programación de Sesiones
+                        Programación de Sesiones ({sesiones.length})
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                        Organiza los contenidos, guías y actividades semana a semana para esta sección.
+                        Organiza los contenidos y asistencias por cada día de clase del horario.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleCreate}
-                    className="inline-flex items-center gap-1.5 bg-[#315d7a] hover:bg-[#254860] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
-                >
-                    <span>+ Nueva Sesión</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsAutoModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                    >
+                        <span>⚡ Generar Automático</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleCreate}
+                        className="inline-flex items-center gap-1.5 bg-[#315d7a] hover:bg-[#254860] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                    >
+                        <span>+ Nueva Sesión</span>
+                    </button>
+                </div>
             </div>
 
             {/* Listado de Sesiones */}
@@ -96,6 +135,13 @@ export default function SesionesTab({ sesiones = [] }) {
                     <p className="text-xs font-medium text-slate-500">
                         Aún no has registrado sesiones de clase para esta sección.
                     </p>
+                    <button
+                        type="button"
+                        onClick={() => setIsAutoModalOpen(true)}
+                        className="mt-3 text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                    >
+                        ⚡ Generar las 16 sesiones automáticamente aquí
+                    </button>
                 </div>
             ) : (
                 <div className="grid gap-3">
@@ -108,12 +154,12 @@ export default function SesionesTab({ sesiones = [] }) {
                                     : 'border-slate-200 bg-slate-50/80 opacity-75'
                             }`}
                         >
-                            {/* Detalles de la sesión */}
                             <div className="space-y-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-[10px] font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">
                                         Sesión #{index + 1}
                                     </span>
+
                                     <span
                                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                             s.activo
@@ -123,18 +169,23 @@ export default function SesionesTab({ sesiones = [] }) {
                                     >
                                         {s.activo ? 'Activa' : 'Inactiva'}
                                     </span>
+
+                                    {s.moodle_section_id && (
+                                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                                            Aula Virtual ID: {s.moodle_section_id}
+                                        </span>
+                                    )}
                                 </div>
 
                                 <h3 className="text-sm font-bold text-slate-800">{s.nombre}</h3>
                                 
                                 {s.fecha && (
                                     <p className="text-xs text-slate-500">
-                                        Fecha: {s.fecha} {s.fecha_fin ? `al ${s.fecha_fin}` : ''}
+                                        Fecha: <strong className="text-slate-700">{s.fecha}</strong>
                                     </p>
                                 )}
                             </div>
 
-                            {/* Botones de acción */}
                             <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                 {s.archivo && (
                                     <a
@@ -180,7 +231,7 @@ export default function SesionesTab({ sesiones = [] }) {
                 </div>
             )}
 
-            {/* Modal para Crear/Editar */}
+            {/* Modal para Crear/Editar individual */}
             {isModalOpen && (
                 <ModalCrearSesion
                     isOpen={isModalOpen}
@@ -189,6 +240,15 @@ export default function SesionesTab({ sesiones = [] }) {
                         setIsModalOpen(false);
                         setSesionAEditar(null);
                     }}
+                />
+            )}
+
+            {/* Modal para Generación Automática */}
+            {isAutoModalOpen && (
+                <ModalGenerarSesiones
+                    isOpen={isAutoModalOpen}
+                    periodoInicio={periodo?.fecha_inicio}
+                    onClose={() => setIsAutoModalOpen(false)}
                 />
             )}
         </div>

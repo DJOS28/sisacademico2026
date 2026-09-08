@@ -14,6 +14,15 @@ return [
     |
     */
 
+    'decolecta' => [
+        'token' => env('DECOLECTA_TOKEN'),
+        'base_url' => env('DECOLECTA_BASE_URL', 'https://api.decolecta.com/v1'),
+    ],
+    'moodle' => [
+        'url'   => env('MOODLE_URL'),
+        'token' => env('MOODLE_TOKEN'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

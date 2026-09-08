@@ -58,4 +58,9 @@ class Personal extends Model
             ]))
         );
     }
+
+    public function solicitudesTramite()
+    {
+        return $this->hasMany(SolicitudTramite::class, 'solicitante_personal_id');
+    }
 }

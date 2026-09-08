@@ -8,6 +8,7 @@ use App\Models\PlanEstudio;
 use App\Models\Postulante;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -56,7 +57,7 @@ class InscripcionController extends Controller
                 'por_pagina' => $filtros['por_pagina'] ?? 10,
             ],
             'admisiones' => Admision::query()->select('id_admision', 'nombre', 'activo')->orderByDesc('id_admision')->get(),
-            'PlanEstudio' => PlanEstudio::query()->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
+            'planesEstudio' => PlanEstudio::query()->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
             'resumen' => [
                 'total' => Inscripcion::count(),
                 'inscritos' => Inscripcion::where('estado', 'inscrito')->count(),
@@ -67,80 +68,114 @@ class InscripcionController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    /**
+     * Carga el formulario de creación presencial/interna (Postulante + Inscripción).
+     */
+    public function create(): Response
     {
-        $buscarPostulante = trim((string) $request->input('buscar_postulante', ''));
-
         return Inertia::render('Inscripciones/Create', [
-            'admisiones' => Admision::query()->where('activo', true)->select('id_admision', 'nombre')->orderByDesc('inicio_proceso')->get(),
-            'postulantes' => Postulante::query()
-                ->when($buscarPostulante !== '', function ($query) use ($buscarPostulante) {
-                    $query->where('nombres', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('apellidos', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('dni', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('codigo_postulante', 'like', "%{$buscarPostulante}%");
-                })
-                ->select('id_postulante', 'codigo_postulante', 'nombres', 'apellidos', 'dni')
-                ->orderBy('apellidos')
-                ->limit(20)
-                ->get(),
-            'PlanEstudio' => PlanEstudio::query()->where('activo', true)->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
-            'filtros' => [
-                'buscar_postulante' => $buscarPostulante,
-            ],
+            'admisiones' => Admision::query()->where('activo', 1)->select('id_admision', 'nombre')->orderByDesc('id_admision')->get(),
+            'planesEstudio' => PlanEstudio::query()->where('activo', 1)->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
         ]);
     }
 
+    /**
+     * Registra en simultáneo al postulante y su inscripción.
+     */
     public function store(Request $request): RedirectResponse
     {
-        $datos = $this->validarInscripcion($request);
-        Inscripcion::create($datos);
+        $datos = $request->validate([
+            // Proceso y Carrera
+            'id_admision' => ['required', 'integer', 'exists:admisiones,id_admision'],
+            'id_plan' => ['required', 'integer', 'exists:planes_estudio,id'],
+            'segunda_opcion' => ['nullable', 'string', 'max:100'],
+            'estado' => ['required', Rule::in(['inscrito', 'observado', 'subsanado', 'aceptado', 'matriculado'])],
+            'observacion' => ['nullable', 'string'],
 
-        return redirect()->route('inscripciones.index')->with('success', 'La inscripción fue registrada correctamente.');
+            // Datos Personales del Nuevo Postulante
+            'nombres' => ['required', 'string', 'max:100'],
+            'apellidos' => ['required', 'string', 'max:100'],
+            'dni' => ['required', 'string', 'max:15', 'unique:postulantes,dni'],
+            'email' => ['required', 'email', 'max:100', 'unique:postulantes,email'],
+            'telefono' => ['required', 'string', 'max:15'],
+            'genero' => ['nullable', 'string', 'max:15'],
+            'fecha_nacimiento' => ['nullable', 'date'],
+            'direccion' => ['nullable', 'string', 'max:100'],
+        ], [
+            'dni.unique' => 'El DNI ingresado ya se encuentra registrado en el sistema.',
+            'email.unique' => 'El correo electrónico ya se encuentra registrado.',
+            'id_admision.required' => 'Seleccione un proceso de admisión.',
+            'id_plan.required' => 'Seleccione una carrera principal.',
+            'nombres.required' => 'Ingrese los nombres del postulante.',
+            'apellidos.required' => 'Ingrese los apellidos del postulante.',
+        ]);
+
+        DB::transaction(function () use ($datos) {
+            // 1. Generar Código de Postulante único
+            $ultimoId = Postulante::max('id_postulante') ?? 0;
+            $codigoPostulante = 'POST-' . date('Y') . '-' . str_pad((string) ($ultimoId + 1), 4, '0', STR_PAD_LEFT);
+
+            // 2. Crear Postulante
+            $postulante = Postulante::create([
+                'codigo_postulante' => $codigoPostulante,
+                'nombres' => $datos['nombres'],
+                'apellidos' => $datos['apellidos'],
+                'dni' => $datos['dni'],
+                'email' => $datos['email'],
+                'telefono' => $datos['telefono'],
+                'genero' => $datos['genero'] ?? 'Masculino',
+                'fecha_nacimiento' => $datos['fecha_nacimiento'] ?? null,
+                'direccion' => $datos['direccion'] ?? null,
+                'grado' => 'Postulante',
+            ]);
+
+            // 3. Crear Registro de Inscripción vinculado al nuevo postulante
+            Inscripcion::create([
+                'id_admision' => $datos['id_admision'],
+                'id_postulante' => $postulante->id_postulante,
+                'id_plan' => $datos['id_plan'],
+                'segunda_opcion' => $datos['segunda_opcion'] ?? null,
+                'estado' => $datos['estado'],
+                'observacion' => $datos['observacion'] ?? null,
+                'fecha_registro' => now(),
+            ]);
+        });
+
+        return redirect()->route('inscripciones.index')->with('success', 'El postulante y su inscripción fueron registrados correctamente.');
     }
 
     public function show(Inscripcion $inscripcion): Response
     {
         $inscripcion->load([
             'admision:id_admision,nombre,inicio_proceso,fin_proceso,activo',
-            'postulante:id_postulante,codigo_postulante,nombres,apellidos,dni,email,telefono,direccion',
+            'postulante:id_postulante,codigo_postulante,nombres,apellidos,dni,email,telefono,direccion,copia_dni,certificado_estudios,comprobante_pago',
             'planEstudio:id,nombre,codigo,tipo',
         ]);
 
         return Inertia::render('Inscripciones/Show', ['inscripcion' => $inscripcion]);
     }
 
-    public function edit(Request $request, Inscripcion $inscripcion): Response
+    public function edit(Inscripcion $inscripcion): Response
     {
-        $buscarPostulante = trim((string) $request->input('buscar_postulante', ''));
-
-        $inscripcion->load(['postulante:id_postulante,codigo_postulante,nombres,apellidos,dni']);
+        $inscripcion->load(['postulante']);
 
         return Inertia::render('Inscripciones/Edit', [
             'inscripcion' => $inscripcion,
-            'admisiones' => Admision::query()->select('id_admision', 'nombre')->orderByDesc('id_admision')->get(),
-            'postulantes' => Postulante::query()
-                ->when($buscarPostulante !== '', function ($query) use ($buscarPostulante) {
-                    $query->where('nombres', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('apellidos', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('dni', 'like', "%{$buscarPostulante}%")
-                        ->orWhere('codigo_postulante', 'like', "%{$buscarPostulante}%");
-                })
-                ->orWhere('id_postulante', $inscripcion->id_postulante)
-                ->select('id_postulante', 'codigo_postulante', 'nombres', 'apellidos', 'dni')
-                ->orderBy('apellidos')
-                ->limit(20)
-                ->get(),
-            'PlanEstudio' => PlanEstudio::query()->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
-            'filtros' => [
-                'buscar_postulante' => $buscarPostulante,
-            ],
+            'admisiones' => Admision::query()->select('id_admision', 'nombre', 'activo')->orderByDesc('id_admision')->get(),
+            'planesEstudio' => PlanEstudio::query()->select('id', 'nombre', 'codigo')->orderBy('nombre')->get(),
         ]);
     }
 
     public function update(Request $request, Inscripcion $inscripcion): RedirectResponse
     {
-        $datos = $this->validarInscripcion($request, $inscripcion);
+        $datos = $request->validate([
+            'id_admision' => ['required', 'integer', 'exists:admisiones,id_admision'],
+            'id_plan' => ['required', 'integer', 'exists:planes_estudio,id'],
+            'segunda_opcion' => ['nullable', 'string', 'max:100'],
+            'estado' => ['required', Rule::in(['inscrito', 'observado', 'subsanado', 'aceptado', 'matriculado'])],
+            'observacion' => ['nullable', 'string'],
+        ]);
+
         $inscripcion->update($datos);
 
         return redirect()->route('inscripciones.index')->with('success', 'La inscripción fue actualizada correctamente.');
@@ -166,29 +201,5 @@ class InscripcionController extends Controller
             report($exception);
             return back()->with('error', 'No se pudo eliminar la inscripción.');
         }
-    }
-
-    private function validarInscripcion(Request $request, ?Inscripcion $inscripcion = null): array
-    {
-        return $request->validate([
-            'id_admision' => ['required', 'integer', 'exists:admisiones,id_admision'],
-            'id_postulante' => [
-                'required',
-                'integer',
-                'exists:postulantes,id_postulante',
-                Rule::unique('inscripcion', 'id_postulante')
-                    ->where('id_admision', $request->input('id_admision'))
-                    ->ignore($inscripcion?->id_inscripcion, 'id_inscripcion'),
-            ],
-            'id_plan' => ['required', 'integer', 'exists:planes_estudio,id'],
-            'segunda_opcion' => ['nullable', 'string', 'max:100'],
-            'estado' => ['required', Rule::in(['inscrito', 'observado', 'subsanado', 'aceptado', 'matriculado'])],
-            'observacion' => ['nullable', 'string'],
-        ], [
-            'id_admision.required' => 'Selecciona un proceso de admisión.',
-            'id_postulante.required' => 'Selecciona un postulante.',
-            'id_postulante.unique' => 'Este postulante ya está inscrito en este proceso.',
-            'id_plan.required' => 'Selecciona un plan de estudio.',
-        ]);
     }
 }

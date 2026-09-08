@@ -13,6 +13,7 @@ class Instituto extends Model
         'nombre',
         'direccion',
         'telefono',
+        'pagina_web',
         'logo',
         'codigo_modular',
         'dre',

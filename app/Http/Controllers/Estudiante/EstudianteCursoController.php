@@ -17,6 +17,12 @@ use Illuminate\Http\JsonResponse;
 use App\Models\PreguntaEvaluacion;
 use App\Models\OpcionPreguntaEvaluacion;
 use App\Models\RespuestaEstudianteEvaluacion;
+use App\Models\SolicitudTramite;
+use App\Models\SolicitudRequisitoArchivo;
+use App\Models\Tramite;
+use Illuminate\Support\Facades\Auth;
+use App\Models\OfertaLaboral;
+use App\Models\Postulacion;
 class EstudianteCursoController extends Controller
 {
     /**
@@ -223,114 +229,137 @@ class EstudianteCursoController extends Controller
      * Muestra las notas detalladas del estudiante por curso matriculado.
      */
     public function misNotas(Request $request): Response
-    {
-        $usuario = $request->user();
+{
+    $usuario = $request->user();
 
-        $estudiante = DB::table('postulantes')
-            ->where('usuario_id', $usuario->id)
-            ->first();
+    $estudiante = DB::table('postulantes')
+        ->where('usuario_id', $usuario->id)
+        ->first();
 
-        $periodoActivo = Periodo::where('activo', 1)->first();
+    $periodoActivo = Periodo::where('activo', 1)->first();
 
-        if (!$estudiante || !$periodoActivo) {
-            return Inertia::render('Estudiante/Notas/Index', [
-                'cursos'            => [],
-                'cursoSeleccionado' => null,
-                'notasLogros'       => [],
-                'notaFinal'         => null,
-                'periodo'           => null,
-            ]);
-        }
-
-        // Matrícula activa
-        $matricula = DB::table('matriculas')
-            ->where('postulante_id', $estudiante->id_postulante)
-            ->where('periodo_id', $periodoActivo->id)
-            ->where('estado', 'Matriculado')
-            ->first();
-
-        if (!$matricula) {
-            return Inertia::render('Estudiante/Notas/Index', [
-                'cursos'            => [],
-                'cursoSeleccionado' => null,
-                'notasLogros'       => [],
-                'notaFinal'         => null,
-                'periodo'           => $periodoActivo->nombre,
-            ]);
-        }
-
-        // Listar cursos matriculados únicos para el selector/tabs
-        $cursos = DB::table('matricula_cursos as mc')
-            ->join('cursos as c', 'c.id', '=', 'mc.curso_id')
-            ->where('mc.matricula_id', $matricula->id)
-            ->select('c.id', 'c.nombre')
-            ->distinct('c.id')
-            ->get();
-
-        // Determinar qué curso mostrar
-        $cursoId = $request->input('curso_id', $cursos->first()?->id);
-        $cursoSeleccionado = $cursos->firstWhere('id', $cursoId);
-
-        $notasLogrosFormatted = [];
-        $notaFinalObj = null;
-
-        if ($cursoId) {
-            // 1. Obtener Logros del curso
-            $logros = DB::table('logros_curso')
-                ->where('curso_id', $cursoId)
-                ->where('id_periodo', $periodoActivo->id)
-                ->get();
-
-            foreach ($logros as $logro) {
-                // Nota asignada al Logro
-                $notaLogro = DB::table('notas_logros')
-                    ->where('estudiante_id', $estudiante->id_postulante)
-                    ->where('curso_id', $cursoId)
-                    ->where('logro_curso_id', $logro->id)
-                    ->value('nota');
-
-                // Subcomponentes del logro
-                $subcomponentes = DB::table('subcomponentes_logro')
-                    ->where('logro_curso_id', $logro->id)
-                    ->get()
-                    ->map(function ($sub) use ($estudiante) {
-                        $notaSub = DB::table('notas_subcomponentes')
-                            ->where('estudiante_id', $estudiante->id_postulante)
-                            ->where('subcomponente_id', $sub->id)
-                            ->value('nota');
-
-                        return [
-                            'id'     => $sub->id,
-                            'nombre' => $sub->nombre,
-                            'peso'   => $sub->peso,
-                            'nota'   => is_numeric($notaSub) ? number_format($notaSub, 2) : '—',
-                        ];
-                    });
-
-                $notasLogrosFormatted[] = [
-                    'id'             => $logro->id,
-                    'nombre'         => $logro->nombre,
-                    'descripcion'    => $logro->descripcion,
-                    'nota'           => is_numeric($notaLogro) ? number_format($notaLogro, 2) : '—',
-                    'subcomponentes' => $subcomponentes,
-                ];
-            }
-
-            // Nota Final Promedio
-            $notaFinalObj = DB::table('nota_final')
-                ->where('estudiante_id', $estudiante->id_postulante)
-                ->where('curso_id', $cursoId)
-                ->first();
-        }
-
+    if (!$estudiante || !$periodoActivo) {
         return Inertia::render('Estudiante/Notas/Index', [
-            'cursos'            => $cursos,
-            'cursoSeleccionado' => $cursoSeleccionado,
-            'notasLogros'       => $notasLogrosFormatted,
-            'notaFinal'         => $notaFinalObj ? number_format($notaFinalObj->promedio, 2) : '—',
+            'cursos'            => [],
+            'cursoSeleccionado' => null,
+            'notasLogros'       => [],
+            'notaFinal'         => null,
+            'periodo'           => null,
+        ]);
+    }
+
+    // Matrícula activa del estudiante
+    $matricula = DB::table('matriculas')
+        ->where('postulante_id', $estudiante->id_postulante)
+        ->where('periodo_id', $periodoActivo->id)
+        ->where('estado', 'Matriculado')
+        ->first();
+
+    if (!$matricula) {
+        return Inertia::render('Estudiante/Notas/Index', [
+            'cursos'            => [],
+            'cursoSeleccionado' => null,
+            'notasLogros'       => [],
+            'notaFinal'         => null,
             'periodo'           => $periodoActivo->nombre,
         ]);
     }
+
+    // Listar cursos matriculados
+    $cursos = DB::table('matricula_cursos as mc')
+        ->join('cursos as c', 'c.id', '=', 'mc.curso_id')
+        ->where('mc.matricula_id', $matricula->id)
+        ->select('c.id', 'c.nombre')
+        ->distinct('c.id')
+        ->get();
+
+    // Determinar qué curso mostrar
+    $cursoId = $request->input('curso_id', $cursos->first()?->id);
+    $cursoSeleccionado = $cursos->firstWhere('id', $cursoId);
+
+    $notasLogrosFormatted = [];
+    $notaFinalObj = null;
+
+    if ($cursoId) {
+        // 1. Obtener Logros del curso
+        $logros = DB::table('logros_curso')
+            ->where('curso_id', $cursoId)
+            ->where('id_periodo', $periodoActivo->id)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        foreach ($logros as $logro) {
+            // Nota asignada al Logro
+            $notaLogro = DB::table('notas_logros')
+                ->where('estudiante_id', $estudiante->id_postulante)
+                ->where('curso_id', $cursoId)
+                ->where('logro_curso_id', $logro->id)
+                ->value('nota');
+
+            // Subcomponentes / Dimensiones del logro
+            $subcomponentes = DB::table('subcomponentes_logro')
+                ->where('logro_curso_id', $logro->id)
+                ->orderBy('id', 'asc')
+                ->get()
+                ->map(function ($sub) use ($estudiante) {
+                    $notaSub = DB::table('notas_subcomponentes')
+                        ->where('estudiante_id', $estudiante->id_postulante)
+                        ->where('subcomponente_id', $sub->id)
+                        ->value('nota');
+
+                    // Criterios individuales de la dimensión (C1, C2, C3, etc.)
+                    $criterios = DB::table('criterios_subcomponente')
+                        ->where('subcomponente_id', $sub->id)
+                        ->orderBy('orden', 'asc')
+                        ->get()
+                        ->map(function ($crit) use ($estudiante) {
+                            $notaCrit = DB::table('notas_criterios')
+                                ->where('estudiante_id', $estudiante->id_postulante)
+                                ->where('criterio_id', $crit->id)
+                                ->value('nota');
+
+                            return [
+                                'id'     => $crit->id,
+                                'codigo' => $crit->codigo,
+                                'nombre' => $crit->nombre,
+                                'orden'  => $crit->orden,
+                                'nota'   => is_numeric($notaCrit) ? number_format($notaCrit, 1) : null,
+                            ];
+                        });
+
+                    return [
+                        'id'        => $sub->id,
+                        'nombre'    => $sub->nombre,
+                        'peso'      => $sub->peso,
+                        'nota'      => is_numeric($notaSub) ? number_format($notaSub, 1) : '—',
+                        'criterios' => $criterios,
+                    ];
+                });
+
+            $notasLogrosFormatted[] = [
+                'id'             => $logro->id,
+                'nombre'         => $logro->nombre,
+                'descripcion'    => $logro->descripcion,
+                'nota'           => is_numeric($notaLogro) ? number_format($notaLogro, 1) : '—',
+                'subcomponentes' => $subcomponentes,
+            ];
+        }
+
+        // Nota Final
+        $notaFinalObj = DB::table('nota_final')
+            ->where('estudiante_id', $estudiante->id_postulante)
+            ->where('curso_id', $cursoId)
+            ->first();
+    }
+
+    return Inertia::render('Estudiante/Notas/Index', [
+        'cursos'            => $cursos,
+        'cursoSeleccionado' => $cursoSeleccionado,
+        'notasLogros'       => $notasLogrosFormatted,
+        'notaFinal'         => $notaFinalObj ? number_format($notaFinalObj->promedio, 1) : '—',
+        'periodo'           => $periodoActivo->nombre,
+    ]);
+}
 
     /**
      * Muestra el reporte detallado de asistencias por curso del estudiante.
@@ -1018,4 +1047,295 @@ public function guardarEvaluacion(Request $request, $evaluacion_id): JsonRespons
         'message' => 'Tus respuestas han sido enviadas correctamente.',
     ], 200);
 }
+
+public function misTramites(Request $request)
+    {
+        $user = Auth::user();
+        
+        // Identificar el ID de estudiante/postulante vinculado al usuario
+        $postulanteId = $user->postulante?->id_postulante ?? $user->id_postulante;
+
+        // 1. Obtener trámites activos con sus requisitos (relación BelongsToMany corregida)
+        $tramitesDisponibles = Tramite::where('estado', 'Activo')
+            ->with('requisitos')
+            ->orderBy('nombre')
+            ->get();
+
+        // 2. Obtener las solicitudes realizadas por el estudiante
+        $misSolicitudes = SolicitudTramite::query()
+            ->with([
+                'tramite',
+                'area',
+                'archivosRequisitos.requisito',
+                'historialDerivaciones.areaOrigen',
+                'historialDerivaciones.areaDestino',
+                'historialDerivaciones.usuario',
+            ])
+            ->where('postulante_id', $postulanteId)
+            ->orderByDesc('fecha_solicitud')
+            ->paginate(10)
+            ->withQueryString();
+
+        return Inertia::render('Estudiante/MisTramites', [
+            'tramitesDisponibles' => $tramitesDisponibles,
+            'solicitudes'         => $misSolicitudes,
+        ]);
+    }
+
+    /**
+     * Registrar un nuevo trámite iniciado por el estudiante desde su panel interno.
+     */
+    public function guardarTramiteEstudiante(Request $request)
+    {
+        $user = Auth::user();
+        $postulanteId = $user->postulante?->id_postulante ?? $user->id_postulante;
+
+        $data = $request->validate([
+            'tramite_id' => ['required', 'exists:tramites,id'],
+            'archivos'   => ['nullable', 'array'],
+            'archivos.*' => ['nullable', 'file', 'mimes:pdf,jpg,png,doc,docx', 'max:10240'],
+        ]);
+
+        DB::transaction(function () use ($data, $request, $postulanteId) {
+            // Ingreso directo a Mesa de Partes General (area_id = 1)
+            $solicitud = SolicitudTramite::create([
+                'tipo_solicitante' => 'postulante',
+                'postulante_id'    => $postulanteId,
+                'tramite_id'       => $data['tramite_id'],
+                'area_id'          => 1, // Mesa de Partes
+                'estado'           => 'pendiente',
+                'prioridad'        => 'media',
+                'fecha_solicitud'  => now(),
+            ]);
+
+            // Guardar archivos adjuntos ordenados por ID de requisito
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $requisitoId => $fileObj) {
+                    if ($fileObj && $fileObj->isValid()) {
+                        $path = $fileObj->store("tramites/estudiantes/{$solicitud->id}", 'public');
+                        SolicitudRequisitoArchivo::create([
+                            'solicitud_id'    => $solicitud->id,
+                            'requisito_id'    => is_numeric($requisitoId) ? (int)$requisitoId : null,
+                            'archivo_ruta'    => $path,
+                            'nombre_original' => $fileObj->getClientOriginalName(),
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return back()->with('success', 'Trámite solicitado correctamente. Puedes realizar el seguimiento desde esta bandeja.');
+    }
+
+    public function bolsaLaboral(Request $request): Response
+    {
+        $usuario = $request->user();
+
+        // 1. Obtener la ficha del estudiante (postulante)
+        $estudiante = DB::table('postulantes')
+            ->where('usuario_id', $usuario->id)
+            ->first();
+
+        $postulanteId = $estudiante?->id_postulante;
+
+        // 2. Parámetros de búsqueda / filtro
+        $buscar = trim((string) $request->input('buscar', ''));
+        $modalidad = trim((string) $request->input('modalidad', ''));
+
+        // 3. Consultar Ofertas Laborales Activas ("Publicada")
+        $ofertasQuery = DB::table('ofertas_laborales as o')
+            ->leftJoin('empresas as e', 'e.id_empresa', '=', 'o.id_empresa')
+            ->leftJoin('tipos_contrato as tc', 'tc.id_tipo_contrato', '=', 'o.id_tipo_contrato')
+            ->leftJoin('planes_estudio as pe', 'pe.id', '=', 'o.id_plan_estudio')
+            ->where('o.estado', 'Publicada')
+            ->when($buscar !== '', function ($query) use ($buscar) {
+                $query->where(function ($sub) use ($buscar) {
+                    $sub->where('o.titulo', 'like', "%{$buscar}%")
+                        ->orWhere('e.nombre_empresa', 'like', "%{$buscar}%")
+                        ->orWhere('o.lugar', 'like', "%{$buscar}%");
+                });
+            })
+            ->when($modalidad !== '', fn ($q) => $q->where('o.modalidad', $modalidad))
+            ->select(
+                'o.id_oferta',
+                'o.titulo',
+                'o.descripcion',
+                'o.fecha_publicacion',
+                'o.fecha_limite',
+                'o.lugar',
+                'o.modalidad',
+                'o.tipo_oferta',
+                'o.remuneracion',
+                'o.vacantes',
+                'o.experiencia',
+                'o.pasos_postular',
+                'o.archivo_pdf',
+                'e.nombre_empresa',
+                'e.logo_empresa',
+                'tc.nombre_tipo_contrato',
+                'pe.nombre as programa_estudio'
+            )
+            ->orderByDesc('o.fecha_publicacion')
+            ->paginate(10)
+            ->withQueryString();
+
+        // 4. Mapear las postulaciones previas del estudiante para saber a cuáles ya postuló
+        $misPostulaciones = [];
+        if ($postulanteId) {
+            $misPostulaciones = DB::table('postulaciones as p')
+                ->join('ofertas_laborales as o', 'o.id_oferta', '=', 'p.id_oferta')
+                ->leftJoin('empresas as e', 'e.id_empresa', '=', 'o.id_empresa')
+                ->where('p.id_postulante', $postulanteId)
+                ->select(
+                    'p.id_postulacion',
+                    'p.id_oferta',
+                    'p.fecha_postulacion',
+                    'p.estado as estado_postulacion',
+                    'p.mensaje_presentacion',
+                    'p.cv_adjunto',
+                    'o.titulo as oferta_titulo',
+                    'e.nombre_empresa',
+                    'e.logo_empresa'
+                )
+                ->orderByDesc('p.fecha_postulacion')
+                ->get();
+        }
+
+        return Inertia::render('Estudiante/BolsaLaboral/Index', [
+            'ofertas'          => $ofertasQuery,
+            'misPostulaciones' => $misPostulaciones,
+            'estudiante'       => $estudiante,
+            'filtros'          => [
+                'buscar'    => $buscar,
+                'modalidad' => $modalidad,
+            ],
+        ]);
+    }
+
+    /**
+     * Registrar la postulación del estudiante a una oferta laboral.
+     */
+    public function postularOferta(Request $request): RedirectResponse
+    {
+        $usuario = $request->user();
+
+        $estudiante = DB::table('postulantes')
+            ->where('usuario_id', $usuario->id)
+            ->first();
+
+        if (!$estudiante) {
+            return back()->with('error', 'No se encontró el perfil del estudiante.');
+        }
+
+        $validated = $request->validate([
+            'id_oferta'            => ['required', 'integer', 'exists:ofertas_laborales,id_oferta'],
+            'mensaje_presentacion' => ['nullable', 'string', 'max:1000'],
+            'cv_adjunto'           => ['nullable', 'file', 'mimes:pdf', 'max:5120'], // Máx 5MB
+        ]);
+
+        // Verificar si ya postuló a esta oferta previamente
+        $existePostulacion = DB::table('postulaciones')
+            ->where('id_postulante', $estudiante->id_postulante)
+            ->where('id_oferta', $validated['id_oferta'])
+            ->exists();
+
+        if ($existePostulacion) {
+            return back()->with('error', 'Ya has registrado una postulación para esta oferta laboral.');
+        }
+
+        // Manejo del archivo CV (si subió uno nuevo o si reutiliza el de su perfil)
+        $rutaCv = $estudiante->curriculum_archivo;
+
+        if ($request->hasFile('cv_adjunto')) {
+            $path = $request->file('cv_adjunto')->store("postulaciones/cvs/{$estudiante->id_postulante}", 'public');
+            $rutaCv = '/storage/' . $path;
+        }
+
+        DB::table('postulaciones')->insert([
+            'id_postulante'        => $estudiante->id_postulante,
+            'id_oferta'            => $validated['id_oferta'],
+            'fecha_postulacion'    => now(),
+            'estado'               => 'Postulado',
+            'cv_adjunto'           => $rutaCv,
+            'mensaje_presentacion' => $validated['mensaje_presentacion'] ?? null,
+            'created_at'           => now(),
+            'updated_at'           => now(),
+        ]);
+
+        return back()->with('success', '¡Tu postulación ha sido enviada con éxito!');
+    }
+
+    public function misPagos(Request $request): Response
+    {
+        $usuario = $request->user();
+
+        // 1. Obtener la ficha del estudiante (postulante)
+        $estudiante = DB::table('postulantes')
+            ->where('usuario_id', $usuario->id)
+            ->first();
+
+        if (!$estudiante) {
+            return Inertia::render('Estudiante/Pagos/Index', [
+                'pagos'      => [],
+                'conceptos'  => [],
+                'resumen'    => null,
+                'estudiante' => null,
+            ]);
+        }
+
+        // 2. Consultar historial de pagos realizados por el estudiante
+        $pagos = DB::table('pagos_postulantes as p')
+            ->leftJoin('conceptos as c', 'c.id_concepto', '=', 'p.concepto_id')
+            ->leftJoin('caja as cj', 'cj.id_caja', '=', 'p.caja_id')
+            ->where('p.postulante_id', $estudiante->id_postulante)
+            ->select(
+                'p.id_pagos',
+                'p.monto',
+                'p.fecha',
+                'p.estado',
+                'p.observacion',
+                'c.nombre as concepto_nombre',
+                'c.precio as concepto_precio',
+                'cj.nombre as caja_nombre'
+            )
+            ->orderByDesc('p.fecha')
+            ->orderByDesc('p.id_pagos')
+            ->get()
+            ->map(fn($p) => [
+                'id'         => $p->id_pagos,
+                'concepto'   => $p->concepto_nombre ?? 'Pago General',
+                'monto'      => number_format($p->monto, 2),
+                'fecha'      => $p->fecha ? Carbon::parse($p->fecha)->format('d/m/Y') : '-',
+                'estado'     => $p->estado ?? 'aceptado',
+                'observacion'=> $p->observacion ?? '—',
+                'caja'       => $p->caja_nombre ?? 'Caja Central',
+            ]);
+
+        // 3. Resumen financiero
+        $montoTotalAceptado = DB::table('pagos_postulantes')
+            ->where('postulante_id', $estudiante->id_postulante)
+            ->where('estado', 'aceptado')
+            ->sum('monto');
+
+        $totalPagos = $pagos->where('estado', 'aceptado')->count();
+
+        // 4. Catálogo de conceptos tarifarios para consulta del estudiante
+        $conceptos = DB::table('conceptos')
+            ->where('activo', 1)
+            ->select('id_concepto', 'nombre', 'precio', 'tipo_concepto')
+            ->orderBy('nombre')
+            ->get();
+
+        return Inertia::render('Estudiante/Pagos/Index', [
+            'pagos'      => $pagos,
+            'conceptos'  => $conceptos,
+            'resumen'    => [
+                'total_pagado' => number_format($montoTotalAceptado, 2),
+                'total_pagos'  => $totalPagos,
+            ],
+            'estudiante' => [
+                'comprobante_pago' => $estudiante->comprobante_pago,
+            ],
+        ]);
+    }
 }

@@ -4,6 +4,17 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useEffect, useMemo, useState } from 'react';
 
+// Conversor auxiliar por si los nombres vienen en números romanos (I, II, III...)
+const parseCicloNumero = (semestre) => {
+    if (!semestre) return 0;
+    if (semestre.orden !== undefined && semestre.orden !== null) return Number(semestre.orden);
+    if (semestre.numero !== undefined && semestre.numero !== null) return Number(semestre.numero);
+    
+    const mapa = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
+    const cleanStr = String(semestre.nombre || semestre).trim().toUpperCase();
+    return mapa[cleanStr] || Number(semestre.id) || 0;
+};
+
 export default function Edit({
     matricula,
     planes = [],
@@ -20,10 +31,10 @@ export default function Edit({
         semestre_id: matricula?.semestre_id ?? '',
         estado: matricula?.estado ?? 'Matriculado',
         fecha_matricula: matricula?.fecha_matricula ? matricula.fecha_matricula.split('T')[0] : '',
-        cursos_seleccionados: cursosActuales ?? [], // [{ horario_id: 114, estado: 'Inscrito' }, ...]
+        cursos_seleccionados: cursosActuales ?? [],
     });
 
-    // Estado para explorar asignaturas por ciclo/semestre
+    // Estado para explorar asignaturas por ciclo
     const [semestreExplorador, setSemestreExplorador] = useState(matricula?.semestre_id ?? '');
     const [ofertaAcademicas, setOfertaAcademicas] = useState(ofertaInicial);
     const [cargandoHorarios, setCargandoHorarios] = useState(false);
@@ -33,10 +44,11 @@ export default function Edit({
         return semestres.find(s => String(s.id) === String(data.semestre_id));
     }, [data.semestre_id, semestres]);
 
-    // RESTRICCIÓN DE UX: Permitir explorar ÚNICAMENTE el ciclo oficial e inferiores
+    // Filtrar para ver únicamente el ciclo oficial y los ciclos inferiores
     const semestresDisponiblesExplorador = useMemo(() => {
         if (!semestrePrincipalObj) return semestres;
-        return semestres.filter(s => Number(s.id) <= Number(semestrePrincipalObj.id));
+        const ordenLimite = parseCicloNumero(semestrePrincipalObj);
+        return semestres.filter(s => parseCicloNumero(s) <= ordenLimite);
     }, [semestrePrincipalObj, semestres]);
 
     // Carga asíncrona al cambiar el ciclo del explorador, periodo o plan
@@ -46,7 +58,7 @@ export default function Edit({
             return;
         }
 
-        // Si se está consultando exactamente el estado inicial cargado desde el servidor
+        // Si es el estado inicial exacto
         if (
             String(data.periodo_id) === String(matricula.periodo_id) && 
             String(semestreExplorador) === String(matricula.semestre_id) &&
@@ -78,13 +90,13 @@ export default function Edit({
         cargarCursosPorSemestre();
     }, [data.periodo_id, semestreExplorador, data.plan_estudio_id]);
 
-    // Mapeo en tiempo real de los horarios activos
+    // Horarios actualmente seleccionados
     const horariosSeleccionadosMap = useMemo(() => {
         const selectedIds = new Set(data.cursos_seleccionados.map(item => String(item.horario_id)));
         return ofertaAcademicas.filter(h => selectedIds.has(String(h.id)));
     }, [data.cursos_seleccionados, ofertaAcademicas]);
 
-    // SELECCIÓN POR PAQUETE COMPLETO DE SECCIÓN
+    // Selección por paquete completo de sección
     const handleToggleCurso = (horarioClickeado) => {
         const bloquesMismaSeccion = ofertaAcademicas.filter(
             h => String(h.curso_id) === String(horarioClickeado.curso_id) && 
@@ -98,12 +110,10 @@ export default function Edit({
         );
 
         if (estaSeleccionado) {
-            // Desmarcar todos los bloques de la sección
             setData('cursos_seleccionados', data.cursos_seleccionados.filter(
                 item => !idsMismaSeccion.has(String(item.horario_id))
             ));
         } else {
-            // Validar si existe choque con otra sección del mismo curso
             const conflictoSeccion = horariosSeleccionadosMap.find(
                 h => String(h.curso_id) === String(horarioClickeado.curso_id) && 
                      String(h.seccion) !== String(horarioClickeado.seccion)
@@ -119,7 +129,6 @@ export default function Edit({
                 return;
             }
 
-            // Determinar condición por defecto: 'Inscrito' para el ciclo oficial, 'Repitencia' para ciclos atrasados
             const esRepitencia = String(semestreExplorador) !== String(data.semestre_id);
             const estadoInicial = esRepitencia ? 'Repitencia' : 'Inscrito';
 
@@ -136,7 +145,6 @@ export default function Edit({
         }
     };
 
-    // Permite modificar manualmente la condición de la asignatura
     const handleCambiarEstadoCurso = (horarioId, nuevoEstado) => {
         setData('cursos_seleccionados', data.cursos_seleccionados.map(item => {
             if (String(item.horario_id) === String(horarioId)) {
@@ -146,12 +154,12 @@ export default function Edit({
         }));
     };
 
+    // Sincronización al cambiar el Ciclo Principal
     const handleCambioSemestrePrincipal = (e) => {
         const val = e.target.value;
         setData('semestre_id', val);
-        if (!semestreExplorador || Number(semestreExplorador) > Number(val)) {
-            setSemestreExplorador(val);
-        }
+        // Sincroniza inmediatamente el explorador con el nuevo ciclo elegido
+        setSemestreExplorador(val);
     };
 
     const handleSubmit = (e) => {
@@ -213,10 +221,10 @@ export default function Edit({
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-6 lg:flex-row items-start w-full">
                 
-                {/* PANEL IZQUIERDO: INFORMACIÓN Y PARÁMETROS */}
+                {/* PANEL IZQUIERDO */}
                 <div className="w-full lg:w-1/3 space-y-5">
                     
-                    {/* Ficha del Estudiante */}
+                    {/* Datos del Alumno */}
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                         <h3 className="text-sm font-bold text-slate-900 mb-3 border-b pb-2 flex items-center justify-between">
                             <span>Información del Alumno</span>
@@ -318,7 +326,7 @@ export default function Edit({
                         <button
                             type="submit"
                             disabled={processing}
-                            className="w-full mt-2 rounded-lg bg-[#315d7a] py-2.5 text-xs font-bold text-white transition hover:bg-[#274b63] disabled:opacity-50 shadow-xs"
+                            className="w-full mt-2 rounded-lg bg-[#315d7a] py-2.5 text-xs font-bold text-white transition hover:bg-[#274b63] disabled:opacity-50 shadow-xs cursor-pointer"
                         >
                             {processing ? 'Guardando Cambios...' : 'Guardar Cambios de Matrícula'}
                         </button>
@@ -326,7 +334,7 @@ export default function Edit({
 
                 </div>
 
-                {/* PANEL DERECHO: BUSCADOR Y TABLA DE CARGA ACADÉMICA */}
+                {/* PANEL DERECHO */}
                 <div className="w-full lg:w-2/3 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 border-b pb-3">
                         <div>
@@ -334,7 +342,7 @@ export default function Edit({
                             <p className="text-[11px] text-slate-500">Agregue o remueva asignaturas para modificar la carga del estudiante.</p>
                         </div>
 
-                        {/* DESPLEGABLE EXPLORADOR RESTRENGIDO A CICLO OFICIAL E INFERIORES */}
+                        {/* SELECTOR EXPLORADOR */}
                         <div className="flex items-center gap-2">
                             <label className="text-xs font-semibold text-slate-600 whitespace-nowrap">Ver ciclo:</label>
                             <select

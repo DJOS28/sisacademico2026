@@ -6,7 +6,8 @@ use App\Models\Silabo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-
+use App\Services\NotificacionService;
+use App\Models\Curso;
 class SilaboController extends Controller
 {
     /**
@@ -33,7 +34,7 @@ class SilaboController extends Controller
     /**
      * Guarda o reemplaza el sílabo del curso en la sección/periodo actual.
      */
-    public function guardar(Request $request)
+   public function guardar(Request $request)
     {
         $request->validate([
             'curso_id'   => 'required|integer|exists:cursos,id',
@@ -75,7 +76,22 @@ class SilaboController extends Controller
             ]
         );
 
-        return back()->with('success', 'Sílabo registrado correctamente.');
+        // =========================================================
+        // NOTIFICACIÓN A ESTUDIANTES MATRICULADOS
+        // =========================================================
+        $curso = Curso::find($request->curso_id);
+        $nombreCurso = $curso?->nombre ?? 'su unidad didáctica';
+
+        NotificacionService::notificarEstudiantesDeCurso(
+            $request->curso_id,
+            $seccionId,
+            $periodoId,
+            "El docente ha publicado un nuevo sílabo para {$nombreCurso}.",
+            'silabo',
+            route('estudiante.cursos')
+        );
+
+        return back()->with('success', 'Sílabo registrado y estudiantes notificados correctamente.');
     }
 
     /**

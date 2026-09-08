@@ -79,9 +79,8 @@ export default function Index({
 
     const notaFinalNum = parseFloat(notaFinal);
     const esPromedioValido = !isNaN(notaFinalNum) && notaFinal !== '—';
-    const esAprobado = esPromedioValido && notaFinalNum >= 11;
+    const esAprobado = esPromedioValido && notaFinalNum >= 13;
 
-    // Contear total de subcomponentes evaluados
     const totalSubcomponentes = notasLogros.reduce(
         (acc, l) => acc + (l.subcomponentes?.length || 0),
         0
@@ -189,7 +188,7 @@ export default function Index({
                                         ? 'En Evaluación'
                                         : esAprobado
                                         ? 'Aprobado Satisfactoriamente'
-                                        : 'En Riesgo Académico'}
+                                        : 'En Recuperación'}
                                 </p>
                             </div>
                             <div className="shrink-0">
@@ -240,14 +239,14 @@ export default function Index({
                     <div className="space-y-5">
                         {notasLogros.map((logro, index) => {
                             const notaLogroNum = parseFloat(logro.nota);
-                            const logroAprobado = !isNaN(notaLogroNum) && notaLogroNum >= 11;
+                            const logroAprobado = !isNaN(notaLogroNum) && notaLogroNum >= 13;
 
                             return (
                                 <div
                                     key={logro.id}
                                     className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs transition hover:border-slate-300"
                                 >
-                                    {/* Header de la Card del Logro */}
+                                    {/* Header del Logro */}
                                     <div className="bg-slate-50/70 p-4 px-5 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
                                             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#315d7a] text-white font-extrabold text-xs shadow-2xs">
@@ -267,7 +266,7 @@ export default function Index({
 
                                         <div className="flex items-center gap-2">
                                             <span className="text-[11px] font-bold text-slate-400 uppercase">
-                                                Nota Logro:
+                                                Prom. Logro:
                                             </span>
                                             <span
                                                 className={`text-sm font-extrabold px-3 py-1 rounded-xl border ${
@@ -283,43 +282,90 @@ export default function Index({
                                         </div>
                                     </div>
 
-                                    {/* Tabla de Evaluaciones / Exámenes del Logro */}
+                                    {/* Tabla Detallada con Criterios */}
                                     {logro.subcomponentes && logro.subcomponentes.length > 0 ? (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left text-xs">
                                                 <thead className="bg-slate-100/40 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
                                                     <tr>
-                                                        <th className="py-3 px-5">Evaluación / Criterio</th>
-                                                        <th className="py-3 px-5 text-center w-28">Peso (%)</th>
-                                                        <th className="py-3 px-5 text-right w-36">Calificación</th>
+                                                        <th className="py-3 px-5 min-w-[180px]">Evaluación / Dimensión</th>
+                                                        <th className="py-3 px-5 text-center w-24">Peso (%)</th>
+                                                        <th className="py-3 px-5 min-w-[220px]">Criterios Evaluados</th>
+                                                        <th className="py-3 px-5 text-right w-28">Calificación</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {logro.subcomponentes.map((sub) => {
                                                         const notaSubNum = parseFloat(sub.nota);
-                                                        const subAprobado = !isNaN(notaSubNum) && notaSubNum >= 11;
+                                                        const subAprobado = !isNaN(notaSubNum) && notaSubNum >= 13;
+                                                        const criterios = sub.criterios || [];
 
                                                         return (
                                                             <tr key={sub.id} className="hover:bg-slate-50/60 transition">
-                                                                <td className="py-3 px-5 font-semibold text-slate-800">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Icon name="fileText" className="h-4 w-4 text-slate-400 shrink-0" />
+                                                                {/* Nombre de la Dimensión */}
+                                                                <td className="py-3.5 px-5 font-semibold text-slate-800">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <Icon name="fileText" className="h-4 w-4 text-[#315d7a] shrink-0" />
                                                                         <span>{sub.nombre}</span>
                                                                     </div>
                                                                 </td>
 
-                                                                <td className="py-3 px-5 text-center text-slate-500 font-medium">
-                                                                    {sub.peso ? `${sub.peso}%` : '—'}
+                                                                {/* Peso */}
+                                                                <td className="py-3.5 px-5 text-center text-slate-500 font-medium">
+                                                                    {sub.peso ? (
+                                                                        <span className="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded">
+                                                                            {sub.peso}%
+                                                                        </span>
+                                                                    ) : (
+                                                                        '—'
+                                                                    )}
                                                                 </td>
 
-                                                                <td className="py-3 px-5 text-right">
+                                                                {/* Chips de Criterios (C1, C2, C3, C4...) */}
+                                                                <td className="py-3.5 px-5">
+                                                                    {criterios.length > 0 ? (
+                                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                                            {criterios.map((crit) => {
+                                                                                const nCrit = crit.nota;
+                                                                                const nCritNum = parseFloat(nCrit);
+                                                                                const critOk = !isNaN(nCritNum) && nCritNum >= 13;
+
+                                                                                return (
+                                                                                    <span
+                                                                                        key={crit.id}
+                                                                                        title={crit.nombre || crit.codigo}
+                                                                                        className="inline-flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] font-mono shadow-2xs"
+                                                                                    >
+                                                                                        <span className="font-bold text-slate-500">{crit.codigo}:</span>
+                                                                                        <span className={`font-black ${
+                                                                                            nCrit === null || nCrit === undefined
+                                                                                                ? 'text-slate-300'
+                                                                                                : critOk
+                                                                                                ? 'text-emerald-700'
+                                                                                                : 'text-rose-600'
+                                                                                        }`}>
+                                                                                            {nCrit !== null && nCrit !== undefined ? nCrit : '-'}
+                                                                                        </span>
+                                                                                    </span>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-[11px] text-slate-400 italic">
+                                                                            Sin criterios desglosados
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Calificación Final de la Dimensión */}
+                                                                <td className="py-3.5 px-5 text-right">
                                                                     <span
-                                                                        className={`font-bold px-2.5 py-0.5 rounded-md inline-block ${
+                                                                        className={`font-bold px-2.5 py-1 rounded-lg inline-block text-xs ${
                                                                             sub.nota === '—'
                                                                                 ? 'text-slate-400 bg-slate-100'
                                                                                 : subAprobado
-                                                                                ? 'text-emerald-700 bg-emerald-50'
-                                                                                : 'text-red-600 bg-red-50 font-extrabold'
+                                                                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200/60'
+                                                                                : 'text-red-700 bg-red-50 border border-red-200/60 font-black'
                                                                         }`}
                                                                     >
                                                                         {sub.nota}

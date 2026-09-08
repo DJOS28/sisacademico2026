@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 function Icon({ name, className = 'h-5 w-5' }) {
     const props = {
@@ -83,7 +84,13 @@ function Icon({ name, className = 'h-5 w-5' }) {
             <>
                 <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
             </>
-        )
+        ),
+        close: (
+            <>
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+            </>
+        ),
     };
 
     return <svg {...props}>{icons[name] ?? null}</svg>;
@@ -155,6 +162,13 @@ export default function EstudianteDashboard({
     const { auth } = usePage().props;
     const user = auth?.user ?? {};
 
+    // Estado para controlar los comunicados visibles
+    const [listaAnuncios, setListaAnuncios] = useState(announcements);
+
+    const descartarAnuncio = (indexADescartar) => {
+        setListaAnuncios((prev) => prev.filter((_, idx) => idx !== indexADescartar));
+    };
+
     const displayName =
         user.nombre_completo ||
         user.username ||
@@ -223,6 +237,41 @@ export default function EstudianteDashboard({
             <Head title="Portal del Estudiante" />
 
             <div className="space-y-6">
+
+                {/* COMUNICADO DESTACADO EN CABECERA (ALERT BANNER CERRABLE) */}
+                {listaAnuncios.length > 0 && (
+                    <div className="relative overflow-hidden rounded-xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#315d7a] text-white">
+                                    <Icon name="bell" className="h-4 w-4" />
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#315d7a]">
+                                            Aviso Importante
+                                        </span>
+                                        <span className="text-[11px] text-slate-400">• {listaAnuncios[0].date}</span>
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-900 mt-0.5">
+                                        {listaAnuncios[0].title}
+                                    </h3>
+                                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                        {listaAnuncios[0].detail}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => descartarAnuncio(0)}
+                                className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-blue-100 hover:text-slate-700 transition"
+                                title="Cerrar aviso"
+                            >
+                                <Icon name="close" className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
                 
                 {/* TARJETAS RESUMEN DE INDICADORES */}
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -389,7 +438,7 @@ export default function EstudianteDashboard({
                     </article>
                 </section>
 
-                {/* COMUNICADOS Y ANUNCIOS */}
+                {/* BANDEJA GENERAL DE COMUNICADOS */}
                 <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
                     <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                         <div>
@@ -404,20 +453,31 @@ export default function EstudianteDashboard({
                     </div>
 
                     <div className="mt-4">
-                        {announcements.length > 0 ? (
+                        {listaAnuncios.length > 0 ? (
                             <div className="grid gap-4 sm:grid-cols-2">
-                                {announcements.map((item, index) => (
+                                {listaAnuncios.map((item, index) => (
                                     <div
                                         key={index}
-                                        className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 hover:bg-white hover:border-[#315d7a]/30 transition"
+                                        className="relative rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 hover:bg-white hover:border-[#315d7a]/30 transition group"
                                     >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <h3 className="text-xs font-bold text-slate-900 leading-snug">
+                                        <button
+                                            type="button"
+                                            onClick={() => descartarAnuncio(index)}
+                                            className="absolute top-3 right-3 rounded-lg p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-200 hover:text-slate-700 transition"
+                                            title="Ocultar comunicado"
+                                        >
+                                            <Icon name="close" className="h-3.5 w-3.5" />
+                                        </button>
+
+                                        <div className="pr-6">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-semibold text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shrink-0">
+                                                    {item.date}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-xs font-bold text-slate-900 leading-snug mt-1.5">
                                                 {item.title}
                                             </h3>
-                                            <span className="text-[10px] font-semibold text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shrink-0">
-                                                {item.date}
-                                            </span>
                                         </div>
                                         <p className="mt-2 text-xs text-slate-600 line-clamp-2 leading-relaxed">
                                             {item.detail}

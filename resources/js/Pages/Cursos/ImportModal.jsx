@@ -20,6 +20,68 @@ export default function ImportModal({
         return null;
     }
 
+    // Generador dinámico de plantilla Excel/CSV sin archivos en el servidor
+    const descargarPlantilla = (e) => {
+        e.preventDefault();
+
+        const cabeceras = [
+            'nombre',
+            'plan_estudio',
+            'semestre',
+            'modulo',
+            'tipo',
+            'creditos',
+            'horas_semestrales',
+            'orden',
+            'descripcion',
+        ];
+
+        const filasEjemplo = [
+            [
+                'Algoritmos y Programación',
+                'DSI-2024',
+                'I',
+                '1',
+                'Especialidad',
+                '4.00',
+                '64',
+                '1',
+                'Lógica de programación y estructuras de control',
+            ],
+            [
+                'Comunicación Efectiva',
+                'DSI-2024',
+                'I',
+                '1',
+                'Empleabilidad',
+                '2.00',
+                '32',
+                '2',
+                'Habilidades comunicativas y redacción técnica',
+            ],
+        ];
+
+        // Codificación UTF-8 con BOM (\uFEFF) para soporte de tildes y caracteres especiales en Excel
+        const contenidoCsv =
+            '\uFEFF' +
+            [
+                cabeceras.join(';'),
+                ...filasEjemplo.map((fila) =>
+                    fila.map((campo) => `"${campo.replace(/"/g, '""')}"`).join(';')
+                ),
+            ].join('\r\n');
+
+        const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'plantilla_importacion_cursos.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const submit = (event) => {
         event.preventDefault();
 
@@ -45,20 +107,21 @@ export default function ImportModal({
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Cargue un archivo Excel con la estructura proporcionada.
+                        Cargue un archivo Excel o CSV con los datos de las asignaturas.
                     </p>
                 </div>
 
                 <div className="space-y-4 p-6">
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                        Columnas obligatorias: nombre, semestre_id,
-                        tipo, id_modulo, creditos,
-                        horas_semestrales y orden.
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 space-y-1">
+                        <p className="font-semibold">Columnas obligatorias por nombre/código:</p>
+                        <p className="text-xs text-blue-700">
+                            <strong>nombre</strong>, <strong>plan_estudio</strong> (código o nombre), <strong>semestre</strong> (ej. I), <strong>modulo</strong> (número o nombre), <strong>tipo</strong>, <strong>creditos</strong>, <strong>horas_semestrales</strong> y <strong>orden</strong>.
+                        </p>
                     </div>
 
                     <div>
                         <label className="mb-2 block text-sm font-semibold text-slate-700">
-                            Archivo Excel
+                            Archivo Excel / CSV
                         </label>
 
                         <input
@@ -67,11 +130,10 @@ export default function ImportModal({
                             onChange={(event) =>
                                 setData(
                                     'archivo',
-                                    event.target.files?.[0] ??
-                                        null
+                                    event.target.files?.[0] ?? null
                                 )
                             }
-                            className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                            className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-[#315d7a] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-[#264960] cursor-pointer"
                         />
 
                         <InputError
@@ -80,12 +142,13 @@ export default function ImportModal({
                         />
                     </div>
 
-                    <a
-                        href="/plantillas/plantilla_importacion_cursos.xlsx"
-                        className="inline-flex text-sm font-semibold text-[#315d7a] hover:underline"
+                    <button
+                        type="button"
+                        onClick={descargarPlantilla}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#315d7a] hover:underline"
                     >
-                        Descargar plantilla de importación
-                    </a>
+                        <span>📥</span> Descargar plantilla de importación
+                    </button>
                 </div>
 
                 <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
@@ -93,7 +156,7 @@ export default function ImportModal({
                         type="button"
                         onClick={onClose}
                         disabled={processing}
-                        className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600"
+                        className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
                     >
                         Cancelar
                     </button>
@@ -101,11 +164,9 @@ export default function ImportModal({
                     <button
                         type="submit"
                         disabled={processing || !data.archivo}
-                        className="rounded-lg bg-[#315d7a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                        className="rounded-lg bg-[#315d7a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#264960] disabled:opacity-60"
                     >
-                        {processing
-                            ? 'Importando...'
-                            : 'Importar archivo'}
+                        {processing ? 'Importando...' : 'Importar archivo'}
                     </button>
                 </div>
             </form>

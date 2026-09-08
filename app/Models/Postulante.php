@@ -74,11 +74,20 @@ class Postulante extends Model
      * Nombre completo del postulante o estudiante.
      */
     protected function nombreCompleto(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => trim(($this->nombres ?? '') . ' ' . ($this->apellidos ?? ''))
-        );
-    }
+{
+    return Attribute::make(
+        get: function () {
+            $apellidos = trim($this->apellidos ?? $this->apellido ?? '');
+            $nombres   = trim($this->nombres ?? $this->nombre ?? '');
+
+            if ($apellidos !== '' && $nombres !== '') {
+                return "{$apellidos}, {$nombres}";
+            }
+
+            return $apellidos ?: $nombres ?: 'Sin Nombre';
+        }
+    );
+}
 
     /**
      * Usuario vinculado al postulante.
@@ -223,5 +232,10 @@ class Postulante extends Model
     public function postulaciones(): HasMany
     {
         return $this->hasMany(Postulacion::class, 'id_postulante', 'id_postulante');
+    }
+
+    public function notasCriterios(): HasMany
+    {
+        return $this->hasMany(NotaCriterio::class, 'estudiante_id', 'id_postulante');
     }
 }

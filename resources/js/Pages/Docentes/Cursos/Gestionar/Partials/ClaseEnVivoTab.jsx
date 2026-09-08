@@ -8,8 +8,15 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
     const { auth } = usePage().props;
     const [clases, setClases] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [claseActiva, setClaseActiva] = useState(null); // Clase seleccionada para entrar a Jitsi
+    const [claseActiva, setClaseActiva] = useState(null);
     const [showModal, setShowModal] = useState(false);
+
+    // Estados para el Modal de Registro de Grabación
+    const [showModalGrabacion, setShowModalGrabacion] = useState(false);
+    const [claseParaGrabacion, setClaseParaGrabacion] = useState(null);
+    const [urlGrabacion, setUrlGrabacion] = useState('');
+    const [duracionMinutos, setDuracionMinutos] = useState('');
+    const [guardandoGrabacion, setGuardandoGrabacion] = useState(false);
 
     const { data, setData, post, processing, reset, errors } = useForm({
         titulo: '',
@@ -63,13 +70,66 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
 
     const handleFinalizarClase = async () => {
         if (!claseActiva) return;
+
+        const claseAFinalizar = { ...claseActiva };
+
         try {
-            await axios.post(route('cursos.clases.estado', claseActiva.id), { estado: 'finalizada' });
+            await axios.post(route('cursos.clases.estado', claseAFinalizar.id), { estado: 'finalizada' });
             setClaseActiva(null);
             fetchClases();
-            Swal.fire('Clase Finalizada', 'La sesión en vivo ha concluido.', 'info');
+
+            // Preguntar al docente si desea ingresar el enlace de grabación inmediatamente
+            Swal.fire({
+                title: 'Clase Finalizada',
+                text: '¿Deseas adjuntar el enlace de la grabación (YouTube, Drive, etc.) ahora?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, adjuntar enlace',
+                cancelButtonText: 'Más tarde',
+                confirmButtonColor: '#315d7a',
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    abrirModalGrabacion(claseAFinalizar);
+                }
+            });
         } catch (error) {
             console.error(error);
+            Swal.fire('Error', 'No se pudo finalizar la clase.', 'error');
+        }
+    };
+
+    const abrirModalGrabacion = (clase) => {
+        setClaseParaGrabacion(clase);
+        setUrlGrabacion(clase.url_grabacion || '');
+        setDuracionMinutos(clase.duracion_minutos || '');
+        setShowModalGrabacion(true);
+    };
+
+    const handleGuardarGrabacion = async (e) => {
+        e.preventDefault();
+        if (!claseParaGrabacion) return;
+
+        setGuardandoGrabacion(true);
+        try {
+            await axios.patch(route('cursos.clases.grabacion', claseParaGrabacion.id), {
+                url_grabacion: urlGrabacion,
+                duracion_minutos: duracionMinutos || null,
+            });
+
+            setShowModalGrabacion(false);
+            fetchClases();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Grabación Registrada',
+                text: 'Los estudiantes ahora pueden acceder al video grabado.',
+                timer: 2000,
+                showConfirmButton: false,
+            });
+        } catch (error) {
+            Swal.fire('Error', error.response?.data?.message || 'No se pudo guardar la grabación.', 'error');
+        } finally {
+            setGuardandoGrabacion(false);
         }
     };
 
@@ -93,7 +153,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
 
     return (
         <div className="space-y-6">
-            {/* Si hay una videoconferencia activa */}
+            {/* SALA DE VIDEOCONFERENCIA EN VIVO */}
             {claseActiva ? (
                 <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -121,7 +181,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                 disableThirdPartyRequests: true,
                                 prejoinPageEnabled: false,
                                 enableWelcomePage: false,
-                                enableLobby: false,         // Desactiva vestíbulo/sala de espera
+                                enableLobby: false,
                                 requireDisplayName: false,
                             }}
                             interfaceConfigOverwrite={{
@@ -136,7 +196,6 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                 email: auth?.user?.email || '',
                             }}
                             onApiReady={(externalApi) => {
-                                // Forzar la desactivación del lobby al conectarse
                                 externalApi.executeCommand('toggleLobby', false);
                             }}
                             onReadyToClose={() => setClaseActiva(null)}
@@ -148,13 +207,13 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                     </div>
                 </div>
             ) : (
-                /* Listado y Programación */
+                /* LISTADO Y PROGRAMACIÓN DE CLASES */
                 <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                         <div>
-                            <h2 className="text-base font-bold text-slate-900">Clases en Vivo Programadas</h2>
+                            <h2 className="text-base font-bold text-slate-900">Clases y Videoconferencias</h2>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Programa las sesiones virtuales de videoconferencia para esta sección.
+                                Sesiones en vivo y repositorio de grabaciones para esta sección.
                             </p>
                         </div>
                         <button
@@ -170,7 +229,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                         <div className="py-12 text-center text-xs text-slate-500">Cargando programaciones...</div>
                     ) : clases.length === 0 ? (
                         <div className="border border-dashed border-slate-200 rounded-xl p-12 text-center bg-slate-50/50">
-                            <p className="text-xs font-medium text-slate-500">No hay clases en vivo programadas para esta sección.</p>
+                            <p className="text-xs font-medium text-slate-500">No hay clases registradas para esta sección.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -203,15 +262,40 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                         </button>
                                     </div>
 
-                                    <div className="text-xs text-slate-500 flex items-center gap-1.5 border-t border-slate-100 pt-3">
-                                        📅 {new Date(item.fecha_inicio).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}
+                                    <div className="text-xs text-slate-500 flex items-center justify-between border-t border-slate-100 pt-3">
+                                        <span>📅 {new Date(item.fecha_inicio).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                                        {item.duracion_minutos && (
+                                            <span className="font-mono font-bold text-slate-600">{item.duracion_minutos} min</span>
+                                        )}
                                     </div>
 
-                                    <div className="pt-1">
+                                    {/* ACCIONES SEGÚN EL ESTADO DE LA CLASE */}
+                                    <div className="pt-1 flex flex-col gap-2">
                                         {item.estado === 'finalizada' ? (
-                                            <button disabled className="w-full bg-slate-100 text-slate-400 py-2 rounded-xl text-xs font-bold">
-                                                Clase Concluida
-                                            </button>
+                                            <div className="flex gap-2">
+                                                {item.url_grabacion ? (
+                                                    <a
+                                                        href={item.url_grabacion}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="flex-1 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 py-2 rounded-xl text-xs font-bold text-center transition"
+                                                    >
+                                                        ▶ Ver Clase Grabada
+                                                    </a>
+                                                ) : (
+                                                    <span className="flex-1 bg-slate-50 text-slate-400 py-2 rounded-xl text-xs font-medium text-center border border-slate-100">
+                                                        Sin grabación adjunta
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => abrirModalGrabacion(item)}
+                                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+                                                    title="Adjuntar o editar enlace de grabación"
+                                                >
+                                                    ⚙️ Enlace
+                                                </button>
+                                            </div>
                                         ) : (
                                             <button
                                                 type="button"
@@ -229,7 +313,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                 </div>
             )}
 
-            {/* Modal Programar Clase */}
+            {/* MODAL PARA PROGRAMAR CLASE */}
             {showModal && (
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
@@ -243,7 +327,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                     value={data.titulo}
                                     onChange={(e) => setData('titulo', e.target.value)}
                                     placeholder="Ej. Clase 01: Introducción al tema"
-                                    className="w-full rounded-xl border-slate-200 text-xs p-2.5 focus:border-[#315d7a]"
+                                    className="w-full rounded-xl border border-slate-200 text-xs p-2.5 outline-none focus:border-[#315d7a]"
                                 />
                                 {errors.titulo && <p className="text-red-500 mt-1">{errors.titulo}</p>}
                             </div>
@@ -253,7 +337,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                 <select
                                     value={data.sesion_id}
                                     onChange={(e) => setData('sesion_id', e.target.value)}
-                                    className="w-full rounded-xl border-slate-200 text-xs p-2.5 focus:border-[#315d7a]"
+                                    className="w-full rounded-xl border border-slate-200 text-xs p-2.5 outline-none focus:border-[#315d7a]"
                                 >
                                     <option value="">-- Ninguna --</option>
                                     {sesiones.map((s) => (
@@ -269,7 +353,7 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                     required
                                     value={data.fecha_inicio}
                                     onChange={(e) => setData('fecha_inicio', e.target.value)}
-                                    className="w-full rounded-xl border-slate-200 text-xs p-2.5 focus:border-[#315d7a]"
+                                    className="w-full rounded-xl border border-slate-200 text-xs p-2.5 outline-none focus:border-[#315d7a]"
                                 />
                             </div>
 
@@ -277,16 +361,76 @@ export default function ClaseEnVivoTab({ sesiones = [] }) {
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-xl text-slate-600 font-bold border border-slate-200"
+                                    className="px-4 py-2 rounded-xl text-slate-600 font-bold border border-slate-200 hover:bg-slate-50 cursor-pointer"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={processing}
-                                    className="bg-[#315d7a] text-white px-4 py-2 rounded-xl font-bold"
+                                    className="bg-[#315d7a] text-white px-4 py-2 rounded-xl font-bold hover:bg-[#254860] cursor-pointer"
                                 >
                                     Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PARA ADJUNTAR O EDITAR ENLACE DE GRABACIÓN */}
+            {showModalGrabacion && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900">Enlace de la Clase Grabada</h3>
+                            <p className="text-xs text-slate-500">Pega el link de YouTube, Google Drive o OneDrive para que los estudiantes la reproduzcan.</p>
+                        </div>
+
+                        <form onSubmit={handleGuardarGrabacion} className="space-y-3 text-xs">
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    URL de la Grabación <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    required
+                                    value={urlGrabacion}
+                                    onChange={(e) => setUrlGrabacion(e.target.value)}
+                                    placeholder="https://youtu.be/... o https://drive.google.com/..."
+                                    className="w-full rounded-xl border border-slate-300 p-2.5 text-xs outline-none focus:border-[#315d7a]"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Duración Aproximada (Minutos)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={duracionMinutos}
+                                    onChange={(e) => setDuracionMinutos(e.target.value)}
+                                    placeholder="Ej. 90"
+                                    className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-mono outline-none focus:border-[#315d7a]"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModalGrabacion(false)}
+                                    className="px-4 py-2 rounded-xl text-slate-600 font-bold border border-slate-200 hover:bg-slate-50 cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={guardandoGrabacion}
+                                    className="bg-[#315d7a] hover:bg-[#254860] text-white px-5 py-2 rounded-xl font-bold transition cursor-pointer disabled:opacity-50"
+                                >
+                                    {guardandoGrabacion ? 'Guardando...' : 'Guardar Enlace'}
                                 </button>
                             </div>
                         </form>

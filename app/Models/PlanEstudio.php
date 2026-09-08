@@ -147,4 +147,13 @@ class PlanEstudio extends Model
             $subquery->where('periodos.id', $periodoId);
         });
     }
+    public function recursosRepositorio(): \Illuminate\Database\Eloquent\Relations\HasMany
+{
+    return $this->hasMany(RepositorioRecurso::class, 'plan_estudio_id');
+}
+
+public function supervisoresAsignados(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\PlanEstudioSupervisor::class, 'plan_estudio_id', 'id');
+    }
 }

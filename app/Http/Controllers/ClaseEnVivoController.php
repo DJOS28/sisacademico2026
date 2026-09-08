@@ -35,7 +35,7 @@ class ClaseEnVivoController extends Controller
     }
 
     /**
-     * Crea/Programar una nueva clase en vivo.
+     * Crea/Programa una nueva clase en vivo.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -54,9 +54,9 @@ class ClaseEnVivoController extends Controller
         }
 
         // Generar un room_name único e impredecible para Jitsi
-        $slugTitle = Str::slug($request->titulo);
+        $slugTitle  = Str::slug($request->titulo);
         $randomCode = Str::random(8);
-        $roomName  = "LMS_C{$cursoId}_S{$seccionId}_P{$periodoId}_{$slugTitle}_{$randomCode}";
+        $roomName   = "LMS_C{$cursoId}_S{$seccionId}_P{$periodoId}_{$slugTitle}_{$randomCode}";
 
         ClaseEnVivo::create([
             'curso_id'     => $cursoId,
@@ -95,11 +95,48 @@ class ClaseEnVivoController extends Controller
 
         if ($request->estado === 'finalizada') {
             $updateData['fecha_fin'] = now();
+
+            // Calcular automáticamente la duración si tenía fecha de inicio
+            if ($clase->fecha_inicio && empty($clase->duracion_minutos)) {
+                $updateData['duracion_minutos'] = max(1, (int) now()->diffInMinutes($clase->fecha_inicio));
+            }
         }
 
         $clase->update($updateData);
 
         return response()->json(['success' => true, 'clase' => $clase]);
+    }
+
+    /**
+     * Registra o actualiza el enlace de la grabación de la clase.
+     */
+    public function registrarGrabacion(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'url_grabacion'    => ['required', 'url', 'max:500'],
+            'duracion_minutos' => ['nullable', 'integer', 'min:1'],
+        ], [
+            'url_grabacion.required' => 'La URL del video o grabación es obligatoria.',
+            'url_grabacion.url'      => 'Debe ingresar un enlace web válido (ej. YouTube, Drive, OneDrive).',
+        ]);
+
+        $seccionId = session('logros_seccion_id');
+
+        $clase = ClaseEnVivo::where('id', $id)
+            ->where('id_seccion', $seccionId)
+            ->firstOrFail();
+
+        $clase->update([
+            'url_grabacion'    => trim($request->url_grabacion),
+            'duracion_minutos' => $request->duracion_minutos ? (int) $request->duracion_minutos : $clase->duracion_minutos,
+            'estado'           => 'finalizada',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Enlace de la grabación registrado con éxito.',
+            'clase'   => $clase,
+        ]);
     }
 
     /**

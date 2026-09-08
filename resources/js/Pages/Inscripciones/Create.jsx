@@ -1,56 +1,61 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 
-export default function Create({ admisiones = [], postulantes = [], planesEstudio = [] }) {
-    const [busqueda, setBusqueda] = useState('');
-
+export default function Create({ admisiones = [], planesEstudio = [] }) {
     const { data, setData, post, processing, errors } = useForm({
-        id_admision: '',
-        id_postulante: '',
+        // 1. Proceso Académico
+        id_admision: admisiones[0]?.id_admision ?? '',
         id_plan: '',
         segunda_opcion: '',
         estado: 'inscrito',
         observacion: '',
-    });
 
-    // Búsqueda AJAX interactiva de postulantes sin recargar formulario
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (busqueda.trim() !== '') {
-                router.get(
-                    route('inscripciones.create'),
-                    { buscar_postulante: busqueda },
-                    { preserveState: true, preserveScroll: true, only: ['postulantes'] }
-                );
-            }
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [busqueda]);
+        // 2. Datos Personales del Nuevo Postulante
+        nombres: '',
+        apellidos: '',
+        dni: '',
+        email: '',
+        telefono: '',
+        genero: 'Masculino',
+        fecha_nacimiento: '',
+        direccion: '',
+    });
 
     const guardar = (e) => {
         e.preventDefault();
         post(route('inscripciones.store'), {
             preserveScroll: true,
             onSuccess: () => {
-                Swal.fire('¡Registrado!', 'La inscripción fue registrada con éxito.', 'success');
+                Swal.fire({
+                    title: '¡Registrado!',
+                    text: 'El postulante y su inscripción fueron guardados con éxito.',
+                    icon: 'success',
+                    confirmButtonColor: '#315d7a',
+                });
             },
             onError: () => {
-                Swal.fire('Error', 'Verifique los campos requeridos.', 'warning');
+                Swal.fire({
+                    title: 'Verifique los Datos',
+                    text: 'Existen errores o campos requeridos sin completar.',
+                    icon: 'warning',
+                    confirmButtonColor: '#315d7a',
+                });
             },
         });
     };
 
     return (
         <AuthenticatedLayout header={<h1 className="text-2xl font-bold text-slate-900">Nueva Inscripción</h1>}>
-            <Head title="Nueva Inscripción" />
+            <Head title="Nueva Inscripción Presencial" />
 
             <div className="w-full space-y-6">
                 <div className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-800">Registrar Inscripción</h2>
-                        <p className="mt-1 text-sm text-slate-500">Asigne el postulante a un proceso y programa.</p>
+                        <h2 className="text-lg font-bold text-slate-800">Registro Completo de Inscripción</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Cree la ficha del postulante e inscríbalo directamente en un proceso de admisión.
+                        </p>
                     </div>
 
                     <Link
@@ -62,88 +67,187 @@ export default function Create({ admisiones = [], postulantes = [], planesEstudi
                 </div>
 
                 <form onSubmit={guardar} className="space-y-6">
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                            {/* ADMISIÓN */}
+                    {/* SECCIÓN 1: DATOS PERSONALES DEL POSTULANTE */}
+                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                        <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#315d7a] text-xs font-bold text-white">1</span>
+                            <h3 className="text-sm font-bold text-slate-800">Datos Personales del Postulante</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Proceso de Admisión *</label>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Nombres <span className="text-rose-600">*</span></label>
+                                <input
+                                    type="text"
+                                    value={data.nombres}
+                                    onChange={(e) => setData('nombres', e.target.value)}
+                                    placeholder="Ej: Juan Carlos"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
+                                />
+                                {errors.nombres && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.nombres}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Apellidos <span className="text-rose-600">*</span></label>
+                                <input
+                                    type="text"
+                                    value={data.apellidos}
+                                    onChange={(e) => setData('apellidos', e.target.value)}
+                                    placeholder="Ej: Pérez Gómez"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
+                                />
+                                {errors.apellidos && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.apellidos}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">DNI / Documento <span className="text-rose-600">*</span></label>
+                                <input
+                                    type="text"
+                                    maxLength="15"
+                                    value={data.dni}
+                                    onChange={(e) => setData('dni', e.target.value)}
+                                    placeholder="Número de DNI"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
+                                />
+                                {errors.dni && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.dni}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Correo Electrónico <span className="text-rose-600">*</span></label>
+                                <input
+                                    type="email"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    placeholder="correo@ejemplo.com"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
+                                />
+                                {errors.email && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.email}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Teléfono / Celular <span className="text-rose-600">*</span></label>
+                                <input
+                                    type="text"
+                                    value={data.telefono}
+                                    onChange={(e) => setData('telefono', e.target.value)}
+                                    placeholder="Ej: 987654321"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
+                                />
+                                {errors.telefono && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.telefono}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Género</label>
+                                <select
+                                    value={data.genero}
+                                    onChange={(e) => setData('genero', e.target.value)}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                >
+                                    <option value="Masculino">Masculino</option>
+                                    <option value="Femenino">Femenino</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                                {errors.genero && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.genero}</p>}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Fecha de Nacimiento</label>
+                                <input
+                                    type="date"
+                                    value={data.fecha_nacimiento}
+                                    onChange={(e) => setData('fecha_nacimiento', e.target.value)}
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                />
+                                {errors.fecha_nacimiento && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.fecha_nacimiento}</p>}
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Dirección de Domicilio</label>
+                                <input
+                                    type="text"
+                                    value={data.direccion}
+                                    onChange={(e) => setData('direccion', e.target.value)}
+                                    placeholder="Av. / Calle / Mz. y Lote"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                />
+                                {errors.direccion && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.direccion}</p>}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* SECCIÓN 2: PROCESO Y PROGRAMA ACADÉMICO */}
+                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                        <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#315d7a] text-xs font-bold text-white">2</span>
+                            <h3 className="text-sm font-bold text-slate-800">Proceso Académico y Estado de Inscripción</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Proceso de Admisión <span className="text-rose-600">*</span></label>
                                 <select
                                     value={data.id_admision}
                                     onChange={(e) => setData('id_admision', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
                                     required
                                 >
-                                    <option value="">Seleccione proceso</option>
+                                    <option value="">-- Seleccione proceso --</option>
                                     {admisiones.map((a) => (
                                         <option key={a.id_admision} value={a.id_admision}>{a.nombre}</option>
                                     ))}
                                 </select>
-                                {errors.id_admision && <p className="mt-1 text-xs text-rose-600">{errors.id_admision}</p>}
+                                {errors.id_admision && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.id_admision}</p>}
                             </div>
 
-                            {/* BUSCADOR Y SELECTOR DE POSTULANTE (AJAX) */}
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Filtrar Postulante (AJAX)</label>
-                                <input
-                                    type="text"
-                                    placeholder="Escriba DNI o Apellido para filtrar..."
-                                    value={busqueda}
-                                    onChange={(e) => setBusqueda(e.target.value)}
-                                    className="mb-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 outline-none"
-                                />
-
-                                <select
-                                    value={data.id_postulante}
-                                    onChange={(e) => setData('id_postulante', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
-                                    required
-                                >
-                                    <option value="">Seleccione postulante</option>
-                                    {postulantes.map((p) => (
-                                        <option key={p.id_postulante} value={p.id_postulante}>
-                                            {p.apellidos}, {p.nombres} ({p.dni})
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.id_postulante && <p className="mt-1 text-xs text-rose-600">{errors.id_postulante}</p>}
-                            </div>
-
-                            {/* PLAN PRINCIPAL */}
-                            <div>
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Programa / Plan de Estudio *</label>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Programa / Carrera Principal <span className="text-rose-600">*</span></label>
                                 <select
                                     value={data.id_plan}
                                     onChange={(e) => setData('id_plan', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
                                     required
                                 >
-                                    <option value="">Seleccione plan</option>
+                                    <option value="">-- Seleccione carrera --</option>
                                     {planesEstudio.map((pe) => (
-                                        <option key={pe.id} value={pe.id}>{pe.nombre}</option>
+                                        <option key={pe.id} value={pe.id}>
+                                            {pe.nombre} {pe.codigo ? `(${pe.codigo})` : ''}
+                                        </option>
                                     ))}
                                 </select>
-                                {errors.id_plan && <p className="mt-1 text-xs text-rose-600">{errors.id_plan}</p>}
+                                {errors.id_plan && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.id_plan}</p>}
                             </div>
 
-                            {/* SEGUNDA OPCIÓN */}
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Segunda Opción (Opcional)</label>
-                                <input
-                                    type="text"
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Segunda Opción de Carrera (Opcional)</label>
+                                <select
                                     value={data.segunda_opcion}
                                     onChange={(e) => setData('segunda_opcion', e.target.value)}
-                                    placeholder="Ej: Contabilidad"
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
-                                />
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                >
+                                    <option value="">-- Ninguna / Opcional --</option>
+                                    {planesEstudio
+                                        .filter((pe) => String(pe.id) !== String(data.id_plan))
+                                        .map((pe) => (
+                                            <option key={pe.id} value={pe.nombre}>
+                                                {pe.nombre}
+                                            </option>
+                                        ))}
+                                </select>
+                                {errors.segunda_opcion && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.segunda_opcion}</p>}
                             </div>
 
-                            {/* ESTADO */}
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Estado Inicial *</label>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Estado Inicial <span className="text-rose-600">*</span></label>
                                 <select
                                     value={data.estado}
                                     onChange={(e) => setData('estado', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
+                                    required
                                 >
                                     <option value="inscrito">Inscrito</option>
                                     <option value="observado">Observado</option>
@@ -151,27 +255,37 @@ export default function Create({ admisiones = [], postulantes = [], planesEstudi
                                     <option value="aceptado">Aceptado</option>
                                     <option value="matriculado">Matriculado</option>
                                 </select>
+                                {errors.estado && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.estado}</p>}
                             </div>
 
-                            {/* OBSERVACIÓN */}
                             <div className="md:col-span-2">
-                                <label className="mb-1 block text-xs font-semibold text-slate-700">Observaciones</label>
+                                <label className="mb-1 block text-xs font-semibold text-slate-700">Observaciones Administrativas</label>
                                 <textarea
                                     value={data.observacion}
                                     onChange={(e) => setData('observacion', e.target.value)}
                                     rows="2"
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#315d7a]/20"
+                                    placeholder="Notas sobre el estado de la documentación, comprobante de pago presencial, etc."
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#315d7a] focus:ring-2 focus:ring-[#315d7a]/20"
                                 />
+                                {errors.observacion && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.observacion}</p>}
                             </div>
                         </div>
                     </section>
 
+                    {/* ACCIONES */}
                     <div className="flex flex-col-reverse justify-end gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row">
-                        <Link href={route('inscripciones.index')} className="inline-flex justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <Link
+                            href={route('inscripciones.index')}
+                            className="inline-flex justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
                             Cancelar
                         </Link>
-                        <button type="submit" disabled={processing} className="inline-flex justify-center rounded-lg bg-[#315d7a] px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-[#274b63] disabled:opacity-60">
-                            {processing ? 'Guardando...' : 'Guardar Inscripción'}
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="inline-flex justify-center rounded-lg bg-[#315d7a] px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-[#274b63] disabled:opacity-60 transition cursor-pointer"
+                        >
+                            {processing ? 'Guardando...' : 'Registrar Postulante e Inscripción'}
                         </button>
                     </div>
                 </form>

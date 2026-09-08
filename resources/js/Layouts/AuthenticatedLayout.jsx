@@ -1,6 +1,7 @@
 import Dropdown from '@/Components/Dropdown';
 import { Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 function Icon({ name, className = 'h-5 w-5' }) {
     const props = {
@@ -100,6 +101,25 @@ function Icon({ name, className = 'h-5 w-5' }) {
                 <path d="m9 12 2 2 4-4" />
             </>
         ),
+        'shield-check': (
+            <>
+                <path d="M12 3 5 6v5c0 4.6 2.8 8.3 7 10 4.2-1.7 7-5.4 7-10V6l-7-3Z" />
+                <path d="m9 12 2 2 4-4" />
+            </>
+        ),
+        award: (
+            <>
+                <circle cx="12" cy="8" r="6" />
+                <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+            </>
+        ),
+        cube: (
+            <>
+                <path d="m21 16-9 5-9-5V8l9-5 9 5v8Z" />
+                <path d="m3.27 6.96 8.73 4.89 8.73-4.89" />
+                <path d="M12 22.08V12" />
+            </>
+        ),
         menu: (
             <>
                 <path d="M4 6h16" />
@@ -145,7 +165,6 @@ function Icon({ name, className = 'h-5 w-5' }) {
 }
 
 const adminNavigation = [
-    // --- MÓDULO 1: GENERAL / PANEL ---
     {
         id: 'general',
         moduleCode: 'PANEL',
@@ -153,14 +172,29 @@ const adminNavigation = [
         label: 'General',
         icon: 'dashboard',
         items: [
-            {
-                label: 'Panel administrativo',
-                routeName: 'dashboard',
-            },
+            { label: 'Panel administrativo', routeName: 'dashboard' },
+            { label: 'Aula Virtual', routeName: 'moodle.sso', targetBlank: true },
         ],
     },
-
-    // --- MÓDULO 2: GESTIÓN INSTITUCIONAL ---
+    {
+        id: 'supervision',
+        moduleCode: 'SUPERVISION',
+        moduleNames: [
+            'Supervisión',
+            'Supervision',
+            'Supervisión docente',
+            'Supervision docente',
+            'Monitoreo académico',
+            'Monitoreo academico',
+            'Control docente',
+        ],
+        label: 'Supervisión y Control',
+        icon: 'shield-check',
+        items: [
+            { label: '👥 Asignar por Plan de Estudio', routeName: 'supervision.planes.index' },
+            { label: '🛡️ Monitoreo Docente', routeName: 'supervision.index' },
+        ],
+    },
     {
         id: 'institucional',
         moduleCode: 'INSTITUCIONAL',
@@ -174,8 +208,6 @@ const adminNavigation = [
             'Administracion General',
             'Planificación',
             'Planificacion',
-            'Supervisión',
-            'Supervision',
         ],
         label: 'Gestión institucional',
         icon: 'institution',
@@ -191,8 +223,6 @@ const adminNavigation = [
             { label: 'Secciones', routeName: 'secciones.index' },
         ],
     },
-
-    // --- MÓDULO 3: GESTIÓN ACADÉMICA ---
     {
         id: 'academico',
         moduleCode: 'ACADEMICO',
@@ -205,16 +235,16 @@ const adminNavigation = [
         label: 'Gestión académica',
         icon: 'academic',
         items: [
-            { label: 'Periodos académicos', routeName: 'periodos.index' },
-            { label: 'Semestres', routeName: 'semestres.index' },
+            { label: 'Periodos Lectivo', routeName: 'periodos.index' },
+            { label: 'Periodo Académico', routeName: 'semestres.index' },
             { label: 'Planes de estudio', routeName: 'planes-estudio.index' },
             { label: 'Módulos formativos', routeName: 'modulos-formativos.index' },
-            { label: 'Cursos', routeName: 'cursos.index' },
+            { label: 'Unidades Didacticas', routeName: 'cursos.index' },
+            { label: 'Malla curricular', routeName: 'planes.malla' },
             { label: 'Horarios', routeName: 'horarios.index' },
+            { label: 'Indicadores y Seguimiento (KPI)', routeName: 'reportes.kpi.index' },
         ],
     },
-
-    // --- MÓDULO 4: ADMISIÓN ---
     {
         id: 'admision',
         moduleCode: 'ADMISION',
@@ -226,12 +256,10 @@ const adminNavigation = [
             { label: 'Medio de Pagos', routeName: 'tipos-pago.index' },
             { label: 'Proceso de Admisión', routeName: 'admisiones.index' },
             { label: 'Inscripciones', routeName: 'inscripciones.index' },
-            { label: 'Observados', routeName: 'admisiones.observados' },
-            { label: 'Rechazados', routeName: 'admisiones.rechazados' },
+            { label: 'Resultado de Admisión', routeName: 'resultados-admision.index' },
+            { label: 'Matrículas de Ingresantes', routeName: 'matriculas.ingresantes.index' },
         ],
     },
-
-    // --- MÓDULO 5: ESTUDIANTES Y MATRÍCULA ---
     {
         id: 'estudiantes',
         moduleCode: 'ESTUDIANTES',
@@ -246,15 +274,26 @@ const adminNavigation = [
         icon: 'users',
         items: [
             { label: 'Estudiantes', routeName: 'estudiantes.index' },
-            { label: 'Matrículas', routeName: 'matriculas.index' },
+            { label: 'Matrícula Ordinaria', routeName: 'matriculas.index' },
             { label: 'Convalidaciones', routeName: 'convalidaciones.index' },
             { label: 'Boleta de Notas', routeName: 'boleta_notas.index' },
+            { label: 'Reporte de Matrículas', routeName: 'reportes.matriculados' },
         ],
     },
-
-    // --- MÓDULO 6: TRÁMITES ACADÉMICOS ---
     {
-        id: 'tramites',
+        id: 'atencion-tramites',
+        alwaysVisible: true,
+        label: 'Gestión Documentaria',
+        icon: 'file-text',
+        items: [
+            { label: '📥 Mesa de Partes (Recepción)', routeName: 'mesa-partes.bandeja' },
+            { label: '🏢 Bandeja de Mi Área', routeName: 'solicitudes.area.index' },
+            { label: '📌 Mis Asignadas', routeName: 'solicitudes.mis-asignadas' },
+            { label: '🔍 Expedientes y Seguimiento', routeName: 'expedientes.index' },
+        ],
+    },
+    {
+        id: 'configuracion-tramites',
         moduleCode: 'TRAMITES',
         moduleNames: [
             'Trámites académicos',
@@ -262,15 +301,15 @@ const adminNavigation = [
             'Trámites',
             'Tramites',
             'Mesa de Partes',
+            'Gestión Documentaria',
         ],
-        label: 'Trámites académicos',
+        label: 'Configuración de Trámites',
         icon: 'file-text',
         items: [
-            { label: 'Gestión de trámites', routeName: 'tramites.index' },
+            { label: '📋 Catálogo de Trámites', routeName: 'tramites.index' },
+            { label: '📝 Requisitos de Trámites', routeName: 'requisitos-tramite.index' },
         ],
     },
-
-    // --- MÓDULO 7: CAJA Y ADMINISTRACIÓN FINANCIERA ---
     {
         id: 'caja',
         moduleCode: 'CAJA',
@@ -288,11 +327,9 @@ const adminNavigation = [
             { label: 'Apertura y Cierre de Caja', routeName: 'caja.index' },
             { label: 'Pagos y cobros', routeName: 'pagos.index' },
             { label: 'Conceptos de pago', routeName: 'conceptos.index' },
-            { label: 'Bienes patrimoniales', routeName: 'bienes.index' },
+            { label: 'Reportes', routeName: 'reportes.cajas.index' },
         ],
     },
-
-    // --- MÓDULO 8: BOLSA LABORAL Y PRÁCTICAS ---
     {
         id: 'bolsa-laboral',
         moduleCode: 'BOLSA_LABORAL',
@@ -312,8 +349,6 @@ const adminNavigation = [
             { label: 'Reporte', routeName: 'panel-analitico.index' },
         ],
     },
-
-    // --- MÓDULO 9: REPOSITORIO ACADÉMICO ---
     {
         id: 'repositorio',
         moduleCode: 'REPOSITORIO',
@@ -326,11 +361,12 @@ const adminNavigation = [
         label: 'Repositorio académico',
         icon: 'book-open',
         items: [
-            { label: 'Documentos y publicaciones', routeName: 'repositorio.index' },
+            { label: 'Categorias', routeName: 'repositorio-categorias.index' },
+            { label: 'Autores', routeName: 'repositorio-autores.index' },
+            { label: 'Recursos', routeName: 'repositorio-recursos.index' },
+            { label: 'Reportes', routeName: 'repositorio.dashboard' },
         ],
     },
-
-    // --- MÓDULO 10: SERVICIOS Y COMUNICACIÓN ---
     {
         id: 'servicios',
         moduleCode: 'SERVICIOS',
@@ -348,8 +384,6 @@ const adminNavigation = [
             { label: 'Anuncios y foros', routeName: 'anuncios.index' },
         ],
     },
-
-    // --- MÓDULO 11: SEGURIDAD Y SISTEMA ---
     {
         id: 'sistema',
         moduleCode: 'SEGURIDAD',
@@ -374,6 +408,50 @@ const adminNavigation = [
             { label: 'Auditoría', routeName: 'auditoria.index' },
         ],
     },
+    {
+        id: 'titulacion',
+        moduleCode: 'TITULACION',
+        moduleNames: [
+            'Titulación',
+            'Titulacion',
+            'Grados y títulos',
+            'Grados y titulos',
+            'Grados',
+            'Títulos',
+            'Titulos',
+        ],
+        label: 'Titulación y Grados',
+        icon: 'award',
+        items: [
+            { label: 'Modalidades', routeName: 'titulacion-modalidades.index' },
+            { label: 'Requisitos previos', routeName: 'titulacion-requisitos.index' },
+            { label: 'Expedientes de titulación', routeName: 'titulaciones.index' },
+            { label: 'Sustentaciones y Actas', routeName: 'titulacion-sustentaciones.index' },
+            { label: 'Libro de Títulos / Registro', routeName: 'titulacion-registro.index' },
+        ],
+    },
+    {
+        id: 'patrimonio',
+        moduleCode: 'PATRIMONIO',
+        moduleNames: [
+            'Patrimonio',
+            'Inventario',
+            'Bienes institucionales',
+            'Control patrimonial',
+            'Activos fijos',
+            'Bienes y servicios',
+        ],
+        label: 'Patrimonio e Inventario',
+        icon: 'cube',
+        items: [
+            { label: 'Categorías de Bienes', routeName: 'patrimonio-categorias.index' },
+            { label: 'Inventario de Bienes', routeName: 'patrimonio-bienes.index' },
+            { label: 'Movimientos y Asignaciones', routeName: 'patrimonio-movimientos.index' },
+            { label: 'Mantenimientos', routeName: 'patrimonio-mantenimientos.index' },
+            { label: 'Bajas de Inventario', routeName: 'patrimonio-bajas.index' },
+            { label: 'Reportes y Códigos QR', routeName: 'patrimonio.dashboard' },
+        ],
+    },
 ];
 
 const docenteNavigation = [
@@ -382,7 +460,11 @@ const docenteNavigation = [
         label: 'General',
         icon: 'dashboard',
         alwaysVisible: true,
-        items: [{ label: 'Panel docente', routeName: 'dashboard' }],
+        items: [
+            { label: 'Panel docente', routeName: 'dashboard' },
+            { label: 'Mi perfil profesional', routeName: 'docente.perfil' },
+            { label: 'Aula Virtual', routeName: 'moodle.sso', targetBlank: true },
+        ],
     },
     {
         id: 'docencia',
@@ -393,6 +475,20 @@ const docenteNavigation = [
             { label: 'Mis cursos', routeName: 'docente.cursos' },
             { label: 'Mi horario', routeName: 'docente.horarios' },
             { label: 'Mis estudiantes', routeName: 'docente.estudiantes' },
+            { label: 'Registro Auxiliar', routeName: 'docente.registro-auxiliar' },
+            { label: 'Control de Asistencias', routeName: 'docente.asistencias.index' },
+            { label: 'Actas y Calificaciones', routeName: 'docente.calificaciones' },
+            { label: 'Avance Silábico', routeName: 'docente.avance-silabico' },
+        ],
+    },
+    {
+        id: 'tutoria',
+        label: 'Acompañamiento Estudiantil',
+        icon: 'users',
+        alwaysVisible: true,
+        items: [
+            { label: 'Tutoría y Consejería', routeName: 'docente.tutoria' },
+            { label: 'Alumnos en riesgo', routeName: 'docente.estudiantes.riesgo' },
         ],
     },
     {
@@ -416,6 +512,7 @@ const estudianteNavigation = [
         items: [
             { label: 'Mi panel', routeName: 'dashboard' },
             { label: 'Mi perfil', routeName: 'estudiante.perfil.edit' },
+            { label: 'Aula Virtual', routeName: 'moodle.sso', targetBlank: true },
         ],
     },
     {
@@ -432,18 +529,6 @@ const estudianteNavigation = [
         ],
     },
     {
-        id: 'aula-virtual',
-        label: 'Aula virtual',
-        icon: 'academic',
-        alwaysVisible: true,
-        items: [
-            { label: 'Materiales', routeName: 'estudiante.materiales' },
-            { label: 'Tareas', routeName: 'estudiante.tareas' },
-            { label: 'Evaluaciones', routeName: 'estudiante.evaluaciones' },
-            { label: 'Foros', routeName: 'estudiante.foros' },
-        ],
-    },
-    {
         id: 'servicios',
         label: 'Servicios',
         icon: 'briefcase',
@@ -451,8 +536,8 @@ const estudianteNavigation = [
         items: [
             { label: 'Mis pagos', routeName: 'estudiante.pagos' },
             { label: 'Mis trámites', routeName: 'estudiante.tramites' },
-            { label: 'Anuncios', routeName: 'anuncios.index' },
-            { label: 'Bolsa laboral', routeName: 'ofertas-laborales.index' },
+            
+            { label: 'Bolsa laboral', routeName: 'estudiante.bolsa-laboral' },
             { label: 'Prácticas', routeName: 'practicas.index' },
         ],
     },
@@ -469,7 +554,7 @@ function normalize(value = '') {
 
 function routeExists(routeName) {
     try {
-        return route().has(routeName);
+        return typeof route === 'function' && route().has(routeName);
     } catch {
         return false;
     }
@@ -481,9 +566,11 @@ function getHref(routeName) {
 
 function isRouteActive(routeName) {
     try {
+        if (typeof route !== 'function') return false;
         return (
             route().current(routeName) ||
-            route().current(`${routeName}.*`)
+            route().current(`${routeName}.*`) ||
+            route().current(`${routeName}*`)
         );
     } catch {
         return false;
@@ -498,6 +585,66 @@ export default function AuthenticatedLayout({ header, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
+
+    // ==========================================
+    // ESTADOS Y EFECTOS PARA NOTIFICACIONES
+    // ==========================================
+    const [notificaciones, setNotificaciones] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const notifRef = useRef(null);
+
+    const cargarNotificaciones = async () => {
+        try {
+            const res = await axios.get(route('notificaciones.obtener'));
+            setNotificaciones(res.data.notificaciones || []);
+            setUnreadCount(res.data.unreadCount || 0);
+        } catch {
+            // Silencioso
+        }
+    };
+
+    useEffect(() => {
+        cargarNotificaciones();
+        const interval = setInterval(cargarNotificaciones, 30000); // Polling cada 30s
+        return () => clearInterval(interval);
+    }, []);
+
+    // Cerrar dropdown al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notifRef.current && !notifRef.current.contains(event.target)) {
+                setNotifOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleMarcarTodasLeidas = async () => {
+        try {
+            await axios.post(route('notificaciones.leer_todas'));
+            setUnreadCount(0);
+            setNotificaciones((prev) => prev.map((n) => ({ ...n, leido: 1 })));
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleMarcarIndividual = async (id, url) => {
+        try {
+            await axios.post(route('notificaciones.leer', id));
+            setNotificaciones((prev) =>
+                prev.map((n) => (n.id_notificacion === id ? { ...n, leido: 1 } : n))
+            );
+            setUnreadCount((prev) => Math.max(prev - 1, 0));
+            if (url) {
+                window.location.href = url;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const username = user.username || 'Usuario';
     const fullName =
@@ -520,7 +667,7 @@ export default function AuthenticatedLayout({ header, children }) {
     );
 
     const normalizedRoles = useMemo(
-        () => userRoles.map((role) => normalize(role)),
+        () => userRoles.map((role) => normalize(typeof role === 'object' ? (role.nombre || role.name || '') : role)),
         [userRoles],
     );
 
@@ -529,6 +676,22 @@ export default function AuthenticatedLayout({ header, children }) {
     const isAdministrator = normalizedRoles.some((role) =>
         role.includes('administrador'),
     );
+
+    const userAreaIds = useMemo(() => {
+        const list = Array.isArray(user.areas) ? user.areas.map((a) => Number(a.id)) : [];
+        if (user.id_area && !list.includes(Number(user.id_area))) {
+            list.push(Number(user.id_area));
+        }
+        return list;
+    }, [user.areas, user.id_area]);
+
+    const isMesaDePartes = useMemo(() => {
+        if (userAreaIds.includes(1)) return true;
+        return (
+            user.areas?.some((a) => normalize(a.nombre ?? '').includes('mesa de partes')) ||
+            normalizedRoles.some((r) => r.includes('mesa de partes'))
+        );
+    }, [userAreaIds, user.areas, normalizedRoles]);
 
     const userModules = useMemo(
         () => (Array.isArray(user.modulos) ? user.modulos : []),
@@ -559,6 +722,15 @@ export default function AuthenticatedLayout({ header, children }) {
                     (name) => normalize(name) === moduleName,
                 )
             );
+        });
+    };
+
+    const filterGroupItems = (group) => {
+        return group.items.filter((item) => {
+            if (item.routeName === 'mesa-partes.bandeja') {
+                return isMesaDePartes || isAdministrator;
+            }
+            return true;
         });
     };
 
@@ -606,11 +778,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 ? current.filter((id) => id !== groupId)
                 : [...current, groupId],
         );
-    };
-
-    const navigateTo = (routeName) => {
-        if (!routeExists(routeName)) return;
-        router.visit(route(routeName));
     };
 
     return (
@@ -692,13 +859,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                 isRouteActive(item.routeName),
                             );
 
+                            const itemsVisibles = filterGroupItems(group);
+                            if (itemsVisibles.length === 0) return null;
+
                             return (
                                 <div key={group.id}>
                                     <button
                                         type="button"
                                         onClick={() => toggleGroup(group.id)}
                                         className={[
-                                            'flex w-full items-center rounded-lg px-3 py-2.5 text-left transition-colors',
+                                            'flex w-full items-center rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
                                             groupActive
                                                 ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10'
                                                 : 'text-slate-200 hover:bg-white/10 hover:text-white',
@@ -739,39 +909,50 @@ export default function AuthenticatedLayout({ header, children }) {
 
                                     {!sidebarCollapsed && isOpen && (
                                         <div className="ml-5 mt-1 space-y-0.5 border-l border-white/15 pl-3">
-                                            {group.items.map((item) => {
+                                            {itemsVisibles.map((item) => {
                                                 const active = isRouteActive(item.routeName);
                                                 const exists = routeExists(item.routeName);
+                                                const itemHref = getHref(item.routeName);
+
+                                                const linkClasses = [
+                                                    'relative flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                                                    active
+                                                        ? 'bg-white/12 font-semibold text-white'
+                                                        : exists
+                                                          ? 'text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer'
+                                                          : 'cursor-not-allowed text-slate-500',
+                                                ].join(' ');
+
+                                                if (item.targetBlank) {
+                                                    return (
+                                                        <a
+                                                            key={item.label}
+                                                            href={itemHref}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={linkClasses}
+                                                        >
+                                                            <span className="truncate">{item.label}</span>
+                                                        </a>
+                                                    );
+                                                }
 
                                                 return (
-                                                    <button
-                                                        key={item.routeName}
-                                                        type="button"
-                                                        onClick={() =>
-                                                            navigateTo(item.routeName)
-                                                        }
-                                                        disabled={!exists}
-                                                        className={[
-                                                            'relative flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                                                            active
-                                                                ? 'bg-white/12 font-semibold text-white'
-                                                                : exists
-                                                                  ? 'text-slate-300 hover:bg-white/10 hover:text-white'
-                                                                  : 'cursor-not-allowed text-slate-500',
-                                                        ].join(' ')}
+                                                    <Link
+                                                        key={item.label}
+                                                        href={itemHref}
+                                                        className={linkClasses}
                                                     >
                                                         {active && (
                                                             <span className="absolute -left-[13px] h-5 w-0.5 rounded-full bg-[#D7A62E]" />
                                                         )}
-                                                        <span className="truncate">
-                                                            {item.label}
-                                                        </span>
+                                                        <span className="truncate">{item.label}</span>
                                                         {!exists && (
                                                             <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
                                                                 Próximo
                                                             </span>
                                                         )}
-                                                    </button>
+                                                    </Link>
                                                 );
                                             })}
                                         </div>
@@ -887,14 +1068,86 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <Icon name="search" className="h-5 w-5" />
                             </button>
 
-                            <button
-                                type="button"
-                                className="relative rounded-lg border border-[#d5e1e8] bg-white p-2.5 text-[#315d7a] shadow-sm transition hover:border-[#16A6A1] hover:bg-[#f1fbfa]"
-                                aria-label="Notificaciones"
-                            >
-                                <Icon name="bell" className="h-5 w-5" />
-                                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                            </button>
+                            {/* ========================================================= */}
+                            {/* NOTIFICACIONES: CAMPANA CON DROPDOWN INTERACTIVO */}
+                            {/* ========================================================= */}
+                            <div className="relative" ref={notifRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setNotifOpen(!notifOpen)}
+                                    className="relative rounded-xl border border-[#d5e1e8] bg-white p-2.5 text-[#315d7a] shadow-xs transition hover:border-[#16A6A1] hover:bg-[#f1fbfa] cursor-pointer"
+                                    aria-label="Notificaciones"
+                                >
+                                    <Icon name="bell" className="h-5 w-5" />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white ring-2 ring-white animate-pulse">
+                                            {unreadCount > 9 ? '+9' : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {notifOpen && (
+                                    <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden">
+                                        {/* Cabecera del Dropdown */}
+                                        <div className="flex items-center justify-between border-b border-slate-100 p-3.5 bg-slate-50">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black text-slate-800">Notificaciones</span>
+                                                {unreadCount > 0 && (
+                                                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                        {unreadCount} nuevas
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {unreadCount > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleMarcarTodasLeidas}
+                                                    className="text-[11px] font-bold text-[#16A6A1] hover:underline cursor-pointer"
+                                                >
+                                                    Marcar todas leídas
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Listado de Notificaciones */}
+                                        <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                                            {notificaciones.length > 0 ? (
+                                                notificaciones.map((n) => (
+                                                    <div
+                                                        key={n.id_notificacion}
+                                                        onClick={() => handleMarcarIndividual(n.id_notificacion, n.url)}
+                                                        className={`p-3.5 text-xs transition flex gap-3 items-start cursor-pointer hover:bg-slate-50 ${
+                                                            n.leido ? 'bg-white text-slate-500' : 'bg-sky-50/40 text-slate-800 font-medium'
+                                                        }`}
+                                                    >
+                                                        <span className="text-lg shrink-0 mt-0.5">
+                                                            {n.tipo === 'silabo' ? '📄' : n.tipo === 'asistencia' ? '📅' : n.tipo === 'notas' ? '📝' : '🔔'}
+                                                        </span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="leading-snug">{n.mensaje}</p>
+                                                            <span className="text-[10px] text-slate-400 mt-1 block">
+                                                                {new Date(n.fecha).toLocaleDateString('es-PE', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                })}
+                                                            </span>
+                                                        </div>
+                                                        {!n.leido && (
+                                                            <span className="h-2 w-2 rounded-full bg-[#16A6A1] shrink-0 mt-1.5" />
+                                                        )}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="p-8 text-center text-xs text-slate-400">
+                                                    No tienes notificaciones pendientes.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             <Dropdown>
                                 <Dropdown.Trigger>

@@ -9,10 +9,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\Schema;
 
 class AdministradorController extends Controller
 {
@@ -78,9 +78,11 @@ class AdministradorController extends Controller
 
             $rolAdministrador = Rol::query()
                 ->whereRaw('LOWER(nombre) = ?', ['administrador'])
-                ->firstOrFail();
+                ->first();
 
-            $usuario->roles()->sync([$rolAdministrador->id]);
+            if ($rolAdministrador) {
+                $usuario->roles()->sync([$rolAdministrador->id]);
+            }
 
             Administrador::create([
                 'usuario_id' => $usuario->id,
@@ -99,7 +101,8 @@ class AdministradorController extends Controller
 
     public function edit(Administrador $administrador): Response
     {
-        $administrador->load('usuario.roles');
+        // Carga ansiosa para asegurar que el usuario y sus roles existan en memoria
+        $administrador->loadMissing('usuario.roles');
 
         return Inertia::render('Administradores/Edit', [
             'administrador' => $this->administradorData($administrador),
@@ -113,23 +116,37 @@ class AdministradorController extends Controller
         DB::transaction(function () use ($datos, $administrador): void {
             $usuario = $administrador->usuario;
 
-            $usuario->update([
-                'username' => $datos['username'],
-                'status' => $datos['status'],
-                'img' => $datos['img'] ?? $usuario->img,
-            ]);
-
-            if (! empty($datos['password'])) {
-                $usuario->update([
-                    'password_hash' => Hash::make($datos['password']),
+            // Si por algún registro inconsistente no tuviese usuario asociado, se crea uno
+            if (! $usuario) {
+                $usuario = Usuario::create([
+                    'username' => $datos['username'],
+                    'password_hash' => Hash::make($datos['password'] ?? '12345678'),
+                    'status' => $datos['status'],
+                    'img' => $datos['img'] ?? null,
                 ]);
+
+                $administrador->update(['usuario_id' => $usuario->id]);
+            } else {
+                $payloadUsuario = [
+                    'username' => $datos['username'],
+                    'status' => $datos['status'],
+                    'img' => $datos['img'] ?? $usuario->img,
+                ];
+
+                if (! empty($datos['password'])) {
+                    $payloadUsuario['password_hash'] = Hash::make($datos['password']);
+                }
+
+                $usuario->update($payloadUsuario);
             }
 
             $rolAdministrador = Rol::query()
                 ->whereRaw('LOWER(nombre) = ?', ['administrador'])
-                ->firstOrFail();
+                ->first();
 
-            $usuario->roles()->sync([$rolAdministrador->id]);
+            if ($rolAdministrador) {
+                $usuario->roles()->syncWithoutDetaching([$rolAdministrador->id]);
+            }
 
             $administrador->update([
                 'dni' => $datos['dni'],
@@ -148,12 +165,15 @@ class AdministradorController extends Controller
     public function actualizarEstado(Request $request, Administrador $administrador): RedirectResponse
     {
         $datos = $request->validate([
-            'status' => ['required', Rule::in(['Activo', 'Inactivo'])],
+            // Incluye 'Desactivado' para soportar desbloqueos desde el listado
+            'status' => ['required', Rule::in(['Activo', 'Inactivo', 'Desactivado'])],
         ]);
 
-        $administrador->usuario()->update([
-            'status' => $datos['status'],
-        ]);
+        if ($administrador->usuario) {
+            $administrador->usuario->update([
+                'status' => $datos['status'],
+            ]);
+        }
 
         return back()->with('success', 'Estado actualizado correctamente.');
     }
@@ -170,107 +190,48 @@ class AdministradorController extends Controller
                 'required',
                 'string',
                 'max:15',
-
                 Rule::unique('administradores', 'dni')
                     ->ignore($administradorId),
-
-                function (
-                    string $attribute,
-                    mixed $value,
-                    \Closure $fail
-                ) use ($administradorId): void {
-                    if ($this->identidadExisteEnOtraTabla(
-                        columna: 'dni',
-                        valor: $value,
-                        tablaActual: 'administradores',
-                        registroActualId: $administradorId
-                    )) {
-                        $fail(
-                            'El DNI ya está registrado en otro perfil del sistema.'
-                        );
+                function (string $attribute, mixed $value, \Closure $fail) use ($administradorId): void {
+                    if ($this->identidadExisteEnOtraTabla('dni', $value, 'administradores', $administradorId)) {
+                        $fail('El DNI ya está registrado en otro perfil del sistema.');
                     }
                 },
             ],
-
-            'nombre' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-
-            'apellido' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-
+            'nombre' => ['required', 'string', 'max:100'],
+            'apellido' => ['required', 'string', 'max:100'],
             'email' => [
                 'required',
                 'email',
                 'max:150',
-
                 Rule::unique('administradores', 'email')
                     ->ignore($administradorId),
-
-                function (
-                    string $attribute,
-                    mixed $value,
-                    \Closure $fail
-                ) use ($administradorId): void {
-                    if ($this->identidadExisteEnOtraTabla(
-                        columna: 'email',
-                        valor: mb_strtolower(trim($value)),
-                        tablaActual: 'administradores',
-                        registroActualId: $administradorId
-                    )) {
-                        $fail(
-                            'El correo electrónico ya está registrado en otro perfil del sistema.'
-                        );
+                function (string $attribute, mixed $value, \Closure $fail) use ($administradorId): void {
+                    if ($this->identidadExisteEnOtraTabla('email', mb_strtolower(trim($value)), 'administradores', $administradorId)) {
+                        $fail('El correo electrónico ya está registrado en otro perfil del sistema.');
                     }
                 },
             ],
-
-            'telefono' => [
-                'nullable',
-                'string',
-                'max:20',
-            ],
-
-            'direccion' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
+            'telefono' => ['nullable', 'string', 'max:20'],
+            'direccion' => ['nullable', 'string', 'max:255'],
             'username' => [
                 'required',
                 'string',
                 'max:50',
-
                 Rule::unique('usuarios', 'username')
                     ->ignore($usuarioId),
             ],
-
             'password' => [
                 $administrador ? 'nullable' : 'required',
                 'string',
                 'min:8',
                 'confirmed',
             ],
-
             'status' => [
                 'required',
-                Rule::in([
-                    'Activo',
-                    'Inactivo',
-                ]),
+                Rule::in(['Activo', 'Inactivo', 'Desactivado']),
             ],
-
-            'img' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+            'img' => ['nullable', 'string', 'max:255'],
         ]);
     }
 
@@ -278,17 +239,17 @@ class AdministradorController extends Controller
     {
         return [
             'id' => $administrador->id,
-            'dni' => $administrador->dni,
-            'nombre' => $administrador->nombre,
-            'apellido' => $administrador->apellido,
-            'email' => $administrador->email,
-            'telefono' => $administrador->telefono,
-            'direccion' => $administrador->direccion,
+            'dni' => $administrador->dni ?? '',
+            'nombre' => $administrador->nombre ?? '',
+            'apellido' => $administrador->apellido ?? '',
+            'email' => $administrador->email ?? '',
+            'telefono' => $administrador->telefono ?? '',
+            'direccion' => $administrador->direccion ?? '',
             'usuario' => [
                 'id' => $administrador->usuario?->id,
-                'username' => $administrador->usuario?->username,
-                'status' => $administrador->usuario?->status,
-                'img' => $administrador->usuario?->img,
+                'username' => $administrador->usuario?->username ?? '',
+                'status' => $administrador->usuario?->status ?? 'Activo',
+                'img' => $administrador->usuario?->img ?? '',
             ],
         ];
     }
@@ -308,11 +269,7 @@ class AdministradorController extends Controller
         ];
 
         foreach ($tablas as $tabla) {
-            if (! Schema::hasTable($tabla)) {
-                continue;
-            }
-
-            if (! Schema::hasColumn($tabla, $columna)) {
+            if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, $columna)) {
                 continue;
             }
 
@@ -324,10 +281,7 @@ class AdministradorController extends Controller
                     [mb_strtolower(trim((string) $valor))]
                 );
             } else {
-                $query->where(
-                    $columna,
-                    trim((string) $valor)
-                );
+                $query->where($columna, trim((string) $valor));
             }
 
             if (
@@ -335,11 +289,7 @@ class AdministradorController extends Controller
                 $registroActualId !== null &&
                 Schema::hasColumn($tabla, 'id')
             ) {
-                $query->where(
-                    'id',
-                    '!=',
-                    $registroActualId
-                );
+                $query->where('id', '!=', $registroActualId);
             }
 
             if ($query->exists()) {

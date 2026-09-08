@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <title>Reporte de Notas</title>
     <style>
+        /* ORIENTACIÓN HORIZONTAL (LANDSCAPE) */
         @page {
-            margin: 18px 20px 20px 20px;
+            size: a4 landscape;
+            margin: 14px 18px 16px 18px;
         }
 
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 10px;
+            font-size: 8.5px;
             color: #222;
             margin: 0;
             padding: 0;
@@ -19,8 +21,8 @@
         .header {
             width: 100%;
             border-bottom: 2px solid #1f3c88;
-            padding-bottom: 8px;
-            margin-bottom: 10px;
+            padding-bottom: 5px;
+            margin-bottom: 6px;
         }
 
         .header-table {
@@ -38,8 +40,8 @@
         }
 
         .logo-img {
-            max-width: 140px;
-            max-height: 70px;
+            max-width: 120px;
+            max-height: 55px;
         }
 
         .title-cell {
@@ -47,7 +49,7 @@
         }
 
         .inst-title {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: bold;
             text-transform: uppercase;
             color: #1f3c88;
@@ -55,26 +57,26 @@
         }
 
         .inst-subtitle {
-            font-size: 10px;
+            font-size: 8.5px;
             margin: 2px 0;
             color: #444;
         }
 
         .report-title {
             text-align: center;
-            margin: 10px 0;
+            margin: 4px 0 6px 0;
         }
 
         .report-title h2 {
-            font-size: 15px;
+            font-size: 12px;
             margin: 0;
             text-transform: uppercase;
             color: #1f3c88;
         }
 
         .report-title h3 {
-            font-size: 11px;
-            margin: 4px 0 0 0;
+            font-size: 9.5px;
+            margin: 2px 0 0 0;
             font-weight: normal;
             color: #333;
         }
@@ -82,84 +84,96 @@
         .section-title {
             background: #1f3c88;
             color: #fff;
-            padding: 5px 8px;
-            font-size: 11px;
+            padding: 3px 6px;
+            font-size: 8.5px;
             font-weight: bold;
-            margin-top: 10px;
-            margin-bottom: 0;
             text-transform: uppercase;
+            margin-top: 5px;
+            margin-bottom: 0;
         }
 
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .info-table td {
             border: 1px solid #cfd6e4;
-            padding: 5px 7px;
+            padding: 3px 6px;
             vertical-align: middle;
-            font-size: 9.5px;
+            font-size: 8px;
         }
 
         .info-label {
-            width: 22%;
+            width: 16%;
             background: #eef3fb;
             font-weight: bold;
             color: #1f3c88;
         }
 
         .info-value {
-            width: 28%;
+            width: 34%;
             color: #222;
         }
 
+        /* TABLA DE CALIFICACIONES */
         .notes-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 6px;
-            font-size: 9px;
-            table-layout: fixed; /* Mantiene proporciones fijas en DomPDF */
+            margin-top: 4px;
+            font-size: 8px;
         }
 
         .notes-table th,
         .notes-table td {
             border: 1px solid #bfc7d4;
-            padding: 5px 3px;
+            padding: 4px 2px;
             text-align: center;
-            word-wrap: break-word;
+            vertical-align: middle;
         }
 
         .notes-table th {
             background: #dfe8f7;
             font-weight: bold;
             color: #0f2557;
-            font-size: 8.5px;
+            font-size: 7.5px;
             text-transform: uppercase;
         }
 
         .notes-table .num-col {
-            width: 30px;
+            width: 22px;
         }
 
         .notes-table .dni-col {
-            width: 75px;
+            width: 58px;
             color: #555;
+            font-size: 7.5px;
         }
 
+        /* COLUMNA DE ESTUDIANTE: NUNCA SE CORTA */
         .notes-table .student-col {
+            width: 220px;
             text-align: left;
-            padding-left: 5px;
+            padding-left: 6px;
+            padding-right: 4px;
             font-weight: bold;
+            font-size: 8px;
+            line-height: 1.2;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            word-break: break-word !important;
         }
 
         .notes-table .prom-col {
-            width: 90px;
+            width: 55px;
+            background: #bae6fd;
+            color: #1f3c88;
+            font-weight: bold;
         }
 
         .notes-table tbody tr:nth-child(even) {
-            background: #f7f9fc;
+            background: #f8fafc;
         }
 
         .promedio-logro {
@@ -171,7 +185,7 @@
             font-weight: bold;
             background: #e0f2fe;
             color: #1f3c88;
-            font-size: 9.5px;
+            font-size: 9px;
         }
 
         .text-desaprobado {
@@ -179,25 +193,48 @@
             font-weight: bold;
         }
 
+        /* LEYENDA */
+        .leyenda-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 7.5px;
+        }
+
+        .leyenda-table td {
+            border: 1px solid #cfd6e4;
+            padding: 3px 6px;
+            vertical-align: top;
+        }
+
+        .leyenda-title {
+            background: #f1f5f9;
+            font-weight: bold;
+            width: 75px;
+            color: #1f3c88;
+            text-align: center;
+        }
+
+        /* FIRMAS */
         .footer-signatures {
             width: 100%;
-            margin-top: 40px;
+            margin-top: 25px;
             border-collapse: collapse;
         }
 
         .signature-box {
-            width: 200px;
+            width: 220px;
             border-top: 1px solid #666;
             text-align: center;
             padding-top: 4px;
-            font-size: 9px;
+            font-size: 8px;
             color: #444;
             margin: 0 auto;
         }
 
         .footer {
-            margin-top: 15px;
-            font-size: 8.5px;
+            margin-top: 8px;
+            font-size: 7.5px;
             color: #666;
             text-align: right;
         }
@@ -228,7 +265,7 @@
                         @endif
                     </p>
                 </td>
-                <td style="width: 100px;"></td>
+                <td style="width: 120px;"></td>
             </tr>
         </table>
     </div>
@@ -305,34 +342,35 @@
                 <tr>
                     <th class="num-col" rowspan="2">N°</th>
                     <th class="dni-col" rowspan="2">DNI / CÓD.</th>
-                    <th class="student-col" rowspan="2">Estudiante</th>
-                    @foreach ($logros as $logro)
+                    <th class="student-col" rowspan="2">APELLIDOS Y NOMBRES</th>
+                    @foreach ($logros as $idx => $logro)
                         @php $subCount = count($logro->subcomponentes); @endphp
-                        <th colSpan="{{ $subCount > 0 ? $subCount + 1 : 1 }}">
-                            {{ $logro->nombre }}
+                        <th colspan="{{ $subCount > 0 ? $subCount + 1 : 1 }}" style="background: #e2e8f0; border-left: 2px solid #94a3b8;">
+                            LOGRO {{ $idx + 1 }}
                         </th>
                     @endforeach
-                    <th class="prom-col" rowspan="2" style="background: #bae6fd; color: #1f3c88;">Promedio Final</th>
+                    <th class="prom-col" rowspan="2">Promedio Final</th>
                 </tr>
                 <tr>
                     @foreach ($logros as $logro)
                         @if(count($logro->subcomponentes) > 0)
                             @foreach($logro->subcomponentes as $sub)
-                                <th>{{ $sub->nombre }}<br>({{ $sub->peso }}%)</th>
+                                <th title="{{ $sub->nombre }}">
+                                    {{ Str::limit($sub->nombre, 7, '.') }}<br>({{ (float)$sub->peso }}%)
+                                </th>
                             @endforeach
-                            <th style="background: #fde68a;">PROM.</th>
+                            <th style="background: #fde68a; width: 34px;">PROM.</th>
                         @else
-                            <th>NOTA</th>
+                            <th style="width: 36px;">NOTA</th>
                         @endif
                     @endforeach
                 </tr>
             @else
-                {{-- Encabezado simplificado cuando no existen logros creados en la sección --}}
                 <tr>
                     <th class="num-col">N°</th>
                     <th class="dni-col">DNI / CÓD.</th>
-                    <th class="student-col">Estudiante</th>
-                    <th class="prom-col" style="background: #bae6fd; color: #1f3c88;">Promedio Final</th>
+                    <th class="student-col">APELLIDOS Y NOMBRES</th>
+                    <th class="prom-col">Promedio Final</th>
                 </tr>
             @endif
         </thead>
@@ -355,7 +393,7 @@
                                                                 ->where('subcomponente_id', $sub->id)
                                                                 ->first()?->nota;
                                 @endphp
-                                <td class="{{ $nSub !== null && $nSub < 11 ? 'text-desaprobado' : '' }}">
+                                <td class="{{ $nSub !== null && $nSub < 13 ? 'text-desaprobado' : '' }}">
                                     {{ $nSub !== null ? number_format($nSub, 1) : '-' }}
                                 </td>
                             @endforeach
@@ -364,7 +402,7 @@
                                                     ->where('logro_curso_id', $logro->id)
                                                     ->first()?->nota;
                             @endphp
-                            <td class="promedio-logro {{ $nLog !== null && $nLog < 11 ? 'text-desaprobado' : '' }}">
+                            <td class="promedio-logro {{ $nLog !== null && $nLog < 13 ? 'text-desaprobado' : '' }}">
                                 {{ $nLog !== null ? number_format($nLog, 1) : '-' }}
                             </td>
                         @else
@@ -373,25 +411,41 @@
                                                     ->where('logro_curso_id', $logro->id)
                                                     ->first()?->nota;
                             @endphp
-                            <td class="{{ $nLog !== null && $nLog < 11 ? 'text-desaprobado' : '' }}">
+                            <td class="{{ $nLog !== null && $nLog < 13 ? 'text-desaprobado' : '' }}">
                                 {{ $nLog !== null ? number_format($nLog, 1) : '-' }}
                             </td>
                         @endif
                     @endforeach
 
-                    <td class="promedio-final prom-col {{ $promFinal !== null && $promFinal < 11 ? 'text-desaprobado' : '' }}">
+                    <td class="promedio-final prom-col {{ $promFinal !== null && $promFinal < 13 ? 'text-desaprobado' : '' }}">
                         {{ $promFinal !== null ? round($promFinal) : '-' }}
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="20" style="padding: 10px; color: #666;">
+                    <td colspan="30" style="padding: 10px; color: #666;">
                         No hay estudiantes registrados en este curso.
                     </td>
                 </tr>
             @endforelse
         </tbody>
     </table>
+
+    {{-- DESCRIPCIÓN DE INDICADORES / LOGROS DE APRENDIZAJE --}}
+    @if(count($logros) > 0)
+        <div class="section-title" style="margin-top: 8px;">DESCRIPCIÓN DE INDICADORES / LOGROS DE APRENDIZAJE</div>
+        <table class="leyenda-table">
+            @foreach ($logros as $idx => $logro)
+                <tr>
+                    <td class="leyenda-title">LOGRO {{ $idx + 1 }}</td>
+                    <td>
+                        <strong>{{ $logro->nombre }}:</strong>
+                        <span style="color: #555;">{{ $logro->descripcion ?? 'Sin descripción adicional.' }}</span>
+                    </td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
 
     {{-- FIRMAS --}}
     <table class="footer-signatures">
@@ -411,7 +465,7 @@
     </table>
 
     <div class="footer">
-        Documento generado automáticamente el {{ date('d/m/Y - H:i') }}
+        Documento generado automáticamente el {{ date('d/m/Y - H:i') }} | Sistema de Gestión Académica
     </div>
 
 </body>

@@ -7,7 +7,7 @@ export default function InscripcionForm({ admisiones = [], planesEstudio = [], a
     const [fileNames, setFileNames] = useState({});
 
     // 2. Inicialización del formulario con todos los campos necesarios
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm({
         id_admision: admisionSeleccionadaId || (admisiones[0]?.id_admision ?? ''),
         id_plan: '',
         segunda_opcion: '',
@@ -46,15 +46,23 @@ export default function InscripcionForm({ admisiones = [], planesEstudio = [], a
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        post(route('inscripcion.publica.store'), {
+        post(route('inscripcion.store'), {
             forceFormData: true,
-            onSuccess: () => {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                // Alerta SweetAlert2 con el mensaje proveniente de Laravel
                 Swal.fire({
                     title: '¡Postulación Recibida!',
-                    text: 'Tu ficha de inscripción se ha enviado correctamente. Revisaremos tu documentación.',
+                    text: page.props.flash?.success || 'Tu ficha de inscripción se ha enviado correctamente. Revisaremos tu documentación.',
                     icon: 'success',
                     confirmButtonColor: '#315d7a',
+                    confirmButtonText: 'Aceptar',
                 });
+
+                // Limpiar datos del formulario y nombres de archivos cargados
+                reset();
+                setFileNames({});
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             },
             onError: (err) => {
                 console.error(err);
@@ -286,7 +294,7 @@ export default function InscripcionForm({ admisiones = [], planesEstudio = [], a
                         </div>
                     </section>
 
-                    {/* SECCIÓN 3: REQUISITOS Y DOCUMENTACIÓN Escaneada */}
+                    {/* SECCIÓN 3: REQUISITOS Y DOCUMENTACIÓN ESCANEADA */}
                     {admisionActual && (
                         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center justify-between">
@@ -298,7 +306,6 @@ export default function InscripcionForm({ admisiones = [], planesEstudio = [], a
                             </div>
 
                             <div className="p-6 space-y-6">
-                                {/* Lista informativa de requisitos definidos en esta admisión */}
                                 {admisionActual.requisitos?.length > 0 && (
                                     <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900">
                                         <p className="font-bold mb-1">Requisitos exigidos en este proceso:</p>

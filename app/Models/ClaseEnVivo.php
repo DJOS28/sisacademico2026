@@ -20,8 +20,16 @@ class ClaseEnVivo extends Model
         'titulo',
         'room_name',
         'estado',
+        'url_grabacion',
+        'duracion_minutos',
         'fecha_inicio',
         'fecha_fin',
+    ];
+
+    protected $casts = [
+        'fecha_inicio'     => 'datetime',
+        'fecha_fin'        => 'datetime',
+        'duracion_minutos' => 'integer',
     ];
 
     public function curso(): BelongsTo

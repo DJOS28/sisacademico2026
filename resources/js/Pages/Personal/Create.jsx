@@ -29,9 +29,11 @@ export default function Create({ roles, areas }) {
     return (
         <AuthenticatedLayout header={<h1 className="text-2xl font-bold text-slate-900">Nuevo personal</h1>}>
             <Head title="Nuevo personal" />
-            <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-6">
-                <Form {...{ data, setData, errors, processing, roles, areas }} />
-            </form>
+            <div className="w-full">
+                <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+                    <Form {...{ data, setData, errors, processing, roles, areas }} />
+                </form>
+            </div>
         </AuthenticatedLayout>
     );
 }

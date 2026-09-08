@@ -28,10 +28,12 @@ export default function Edit({ personal, roles, areas }) {
 
     return (
         <AuthenticatedLayout header={<h1 className="text-2xl font-bold text-slate-900">Editar personal</h1>}>
-            <Head title="Editar personal" />
-            <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-6">
-                <Form {...{ data, setData, errors, processing, roles, areas }} editing />
-            </form>
+            <Head title={`Editar - ${personal.nombre}`} />
+            <div className="w-full">
+                <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+                    <Form {...{ data, setData, errors, processing, roles, areas }} editing />
+                </form>
+            </div>
         </AuthenticatedLayout>
     );
 }

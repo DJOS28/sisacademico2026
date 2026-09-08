@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 import { useState } from 'react';
 
 function Icon({ name, className = 'h-5 w-5' }) {
@@ -53,18 +55,30 @@ function Icon({ name, className = 'h-5 w-5' }) {
                 <polyline points="2 12 12 17 22 12" />
             </>
         ),
+        bolt: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
     };
 
     return <svg {...props}>{icons[name] ?? null}</svg>;
 }
 
-export default function LogrosIndex({ curso, seccion, periodo, logros = [], filters = {} }) {
-    // Estados para Modales
+export default function LogrosIndex({ curso, seccion, periodo, logros = [] }) {
+    // Modales de Logro
     const [modalLogro, setModalLogro] = useState(false);
-    const [editingLogro, setEditingLogro] = useState(null); // Null = Crear, Objeto = Editar
+    const [editingLogro, setEditingLogro] = useState(null);
+
+    // Modales de Subcomponente / Dimensión
+    const [modalSub, setModalSub] = useState(false);
+    const [editingSub, setEditingSub] = useState(null);
     const [selectedLogroForSub, setSelectedLogroForSub] = useState(null);
 
-    // Formulario para Crear / Editar Logro
+    // Modales de Criterio
+    const [modalCriterio, setModalCriterio] = useState(false);
+    const [editingCriterio, setEditingCriterio] = useState(null);
+    const [selectedSubForCrit, setSelectedSubForCrit] = useState(null);
+    const [criterioForm, setCriterioForm] = useState({ codigo: '', nombre: '', peso: 0 });
+    const [generating, setGenerating] = useState(false);
+
+    // Formulario de Logro
     const {
         data: dataLogro,
         setData: setDataLogro,
@@ -82,11 +96,12 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
         descripcion: '',
     });
 
-    // Formulario para Crear Subcomponente
+    // Formulario de Subcomponente (Dimensión) con Peso
     const {
         data: dataSub,
         setData: setDataSub,
         post: postSub,
+        put: putSub,
         reset: resetSub,
         errors: errorsSub,
         processing: processingSub,
@@ -94,10 +109,12 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
     } = useForm({
         nombre: '',
         descripcion: '',
-        peso: '',
+        peso: '33.33',
     });
 
-    // Abrir modal de creación de logro
+    // -------------------------------------------------------------
+    // GESTIÓN DE LOGROS
+    // -------------------------------------------------------------
     const openCreateLogroModal = () => {
         clearErrorsLogro();
         setEditingLogro(null);
@@ -111,7 +128,6 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
         setModalLogro(true);
     };
 
-    // Abrir modal de edición de logro
     const openEditLogroModal = (logro) => {
         clearErrorsLogro();
         setEditingLogro(logro);
@@ -125,12 +141,9 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
         setModalLogro(true);
     };
 
-    // Guardar o Actualizar Logro
     const handleSaveLogro = (e) => {
         e.preventDefault();
-
         if (editingLogro) {
-            // Actualizar logro existente
             putLogro(route('logros.update', editingLogro.id), {
                 onSuccess: () => {
                     setModalLogro(false);
@@ -139,7 +152,6 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                 },
             });
         } else {
-            // Crear nuevo logro
             postLogro(route('cursos.logros.store'), {
                 onSuccess: () => {
                     setModalLogro(false);
@@ -149,37 +161,152 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
         }
     };
 
-    // Eliminar Logro
     const handleDeleteLogro = (logroId) => {
-        if (confirm('¿Deseas eliminar este logro de aprendizaje y todos sus subcomponentes?')) {
-            router.delete(route('logros.destroy', logroId));
-        }
-    };
-
-    // Abrir Modal de Subcomponente
-    const openSubcomponenteModal = (logro) => {
-        clearErrorsSub();
-        setSelectedLogroForSub(logro);
-        resetSub();
-    };
-
-    // Guardar Subcomponente
-    const handleStoreSubcomponente = (e) => {
-        e.preventDefault();
-        if (!selectedLogroForSub) return;
-
-        postSub(route('logros.subcomponentes.store', selectedLogroForSub.id), {
-            onSuccess: () => {
-                setSelectedLogroForSub(null);
-                resetSub();
-            },
+        Swal.fire({
+            title: '¿Eliminar Logro?',
+            text: 'Se eliminarán sus dimensiones, criterios y notas asociadas.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+        }).then((res) => {
+            if (res.isConfirmed) {
+                router.delete(route('logros.destroy', logroId));
+            }
         });
     };
 
-    // Eliminar Subcomponente
+    // -------------------------------------------------------------
+    // GESTIÓN DE SUBCOMPONENTES / DIMENSIONES (CON PESO)
+    // -------------------------------------------------------------
+    const openCreateSubModal = (logro) => {
+        clearErrorsSub();
+        setSelectedLogroForSub(logro);
+        setEditingSub(null);
+        setDataSub({
+            nombre: '',
+            descripcion: '',
+            peso: '33.33',
+        });
+        setModalSub(true);
+    };
+
+    const openEditSubModal = (sub) => {
+        clearErrorsSub();
+        setSelectedLogroForSub(null);
+        setEditingSub(sub);
+        setDataSub({
+            nombre: sub.nombre,
+            descripcion: sub.descripcion || '',
+            peso: sub.peso ? String(sub.peso) : '0',
+        });
+        setModalSub(true);
+    };
+
+    const handleSaveSubcomponente = (e) => {
+        e.preventDefault();
+        if (editingSub) {
+            putSub(route('subcomponentes.update', editingSub.id), {
+                onSuccess: () => {
+                    setModalSub(false);
+                    setEditingSub(null);
+                    resetSub();
+                },
+            });
+        } else if (selectedLogroForSub) {
+            postSub(route('logros.subcomponentes.store', selectedLogroForSub.id), {
+                onSuccess: () => {
+                    setModalSub(false);
+                    setSelectedLogroForSub(null);
+                    resetSub();
+                },
+            });
+        }
+    };
+
     const handleDeleteSubcomponente = (subId) => {
-        if (confirm('¿Deseas eliminar este subcomponente de evaluación?')) {
+        if (confirm('¿Deseas eliminar esta dimensión y todos sus criterios?')) {
             router.delete(route('subcomponentes.destroy', subId));
+        }
+    };
+
+    // -------------------------------------------------------------
+    // GESTIÓN DE CRITERIOS (CON PESO)
+    // -------------------------------------------------------------
+    const openCreateCriterioModal = (sub) => {
+        setSelectedSubForCrit(sub);
+        setEditingCriterio(null);
+        setCriterioForm({
+            codigo: `C${(sub.criterios?.length || 0) + 1}`,
+            nombre: '',
+            peso: 25,
+        });
+        setModalCriterio(true);
+    };
+
+    const openEditCriterioModal = (sub, crit) => {
+        setSelectedSubForCrit(sub);
+        setEditingCriterio(crit);
+        setCriterioForm({
+            codigo: crit.codigo,
+            nombre: crit.nombre || '',
+            peso: crit.peso ?? 0,
+        });
+        setModalCriterio(true);
+    };
+
+    const handleSaveCriterio = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingCriterio) {
+                await axios.put(route('criterios.update', editingCriterio.id), {
+                    codigo: criterioForm.codigo,
+                    nombre: criterioForm.nombre,
+                    peso: criterioForm.peso,
+                });
+            } else {
+                await axios.post(route('criterios.store'), {
+                    subcomponente_id: selectedSubForCrit.id,
+                    codigo: criterioForm.codigo,
+                    nombre: criterioForm.nombre,
+                    peso: criterioForm.peso,
+                    orden: (selectedSubForCrit.criterios?.length || 0) + 1,
+                });
+            }
+            setModalCriterio(false);
+            setEditingCriterio(null);
+            router.reload({ only: ['logros'] });
+        } catch (error) {
+            Swal.fire('Error', error.response?.data?.message || 'No se pudo guardar el criterio.', 'error');
+        }
+    };
+
+    const handleDeleteCriterio = async (critId) => {
+        if (confirm('¿Deseas eliminar este criterio de evaluación?')) {
+            try {
+                await axios.delete(route('criterios.destroy', critId));
+                router.reload({ only: ['logros'] });
+            } catch (error) {
+                Swal.fire('Error', 'No se pudo eliminar el criterio.', 'error');
+            }
+        }
+    };
+
+    const handleGenerarCriteriosDefecto = async (subId) => {
+        try {
+            await axios.post(route('criterios.generar_defecto', subId));
+            Swal.fire({
+                icon: 'success',
+                title: '¡Criterios C1-C4 Creados!',
+                text: 'Se asignó 25% de peso a cada uno.',
+                timer: 1300,
+                showConfirmButton: false,
+            });
+            router.reload({ only: ['logros'] });
+        } catch (error) {
+            Swal.fire('Error', 'No se pudieron generar los criterios.', 'error');
         }
     };
 
@@ -191,7 +318,7 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                         <button
                             type="button"
                             onClick={() => router.get(route('docente.cursos'))}
-                            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+                            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer"
                             title="Volver a mis cursos"
                         >
                             <Icon name="arrowLeft" className="h-5 w-5" />
@@ -206,7 +333,7 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                 </span>
                             </div>
                             <h1 className="mt-1 text-xl font-bold text-slate-900">
-                                Logros de Aprendizaje: <span className="text-[#315d7a]">{curso.nombre}</span>
+                                Estructura de Logros y Criterios: <span className="text-[#315d7a]">{curso.nombre}</span>
                             </h1>
                         </div>
                     </div>
@@ -214,7 +341,7 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                     <button
                         type="button"
                         onClick={openCreateLogroModal}
-                        className="inline-flex items-center gap-2 bg-[#315d7a] hover:bg-[#254860] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs"
+                        className="inline-flex items-center gap-2 bg-[#315d7a] hover:bg-[#254860] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                     >
                         <Icon name="plus" className="h-4 w-4" />
                         <span>Nuevo Logro</span>
@@ -225,16 +352,13 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
             <Head title={`Logros - ${curso.nombre}`} />
 
             <div className="space-y-6">
-
-                {/* LISTA DE LOGROS DE APRENDIZAJE */}
                 {logros.length > 0 ? (
                     <div className="space-y-5">
                         {logros.map((logro, index) => {
-                            const totalPeso = logro.subcomponentes?.reduce((acc, item) => acc + Number(item.peso), 0) || 0;
+                            const subcomponentes = logro.subcomponentes || [];
 
                             return (
                                 <div key={logro.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
-                                    
                                     {/* Encabezado del Logro */}
                                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-100 pb-4">
                                         <div className="flex items-start gap-3">
@@ -249,20 +373,20 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 shrink-0">
+                                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                             <button
                                                 type="button"
-                                                onClick={() => openSubcomponenteModal(logro)}
-                                                className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                                                onClick={() => openCreateSubModal(logro)}
+                                                className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
                                             >
                                                 <Icon name="plus" className="h-3.5 w-3.5 text-[#315d7a]" />
-                                                <span>Añadir Criterio</span>
+                                                <span>+ Dimensión</span>
                                             </button>
 
                                             <button
                                                 type="button"
                                                 onClick={() => openEditLogroModal(logro)}
-                                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#315d7a] hover:bg-slate-100 transition"
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#315d7a] hover:bg-slate-100 transition cursor-pointer"
                                                 title="Editar Logro"
                                             >
                                                 <Icon name="pencil" className="h-4 w-4" />
@@ -271,7 +395,7 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                             <button
                                                 type="button"
                                                 onClick={() => handleDeleteLogro(logro.id)}
-                                                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition"
+                                                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition cursor-pointer"
                                                 title="Eliminar Logro"
                                             >
                                                 <Icon name="trash" className="h-4 w-4" />
@@ -279,50 +403,124 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                         </div>
                                     </div>
 
-                                    {/* Subcomponentes / Criterios */}
+                                    {/* Subcomponentes / Dimensiones */}
                                     <div className="pl-0 sm:pl-12">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                                                 <Icon name="layers" className="h-3.5 w-3.5 text-[#315d7a]" />
-                                                Subcomponentes de evaluación ({logro.subcomponentes?.length || 0})
-                                            </span>
-                                            <span className={`text-xs font-bold ${totalPeso === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                Peso Total: {totalPeso}% {totalPeso !== 100 && '(Recomendado: 100%)'}
+                                                Dimensiones de Evaluación ({subcomponentes.length})
                                             </span>
                                         </div>
 
-                                        {logro.subcomponentes && logro.subcomponentes.length > 0 ? (
-                                            <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                                                {logro.subcomponentes.map((sub) => (
-                                                    <div key={sub.id} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-2">
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs font-bold text-slate-800 truncate">{sub.nombre}</p>
-                                                            {sub.descripcion && <p className="text-[11px] text-slate-400 truncate">{sub.descripcion}</p>}
-                                                        </div>
+                                        {subcomponentes.length > 0 ? (
+                                            <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+                                                {subcomponentes.map((sub) => {
+                                                    const criteriosList = sub.criterios || [];
 
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <span className="bg-white border border-slate-200 text-[#315d7a] text-[11px] font-bold px-2 py-0.5 rounded-md">
-                                                                {sub.peso}%
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteSubcomponente(sub.id)}
-                                                                className="text-slate-400 hover:text-rose-600 transition"
-                                                                title="Eliminar Subcomponente"
-                                                            >
-                                                                <Icon name="trash" className="h-3.5 w-3.5" />
-                                                            </button>
+                                                    return (
+                                                        <div key={sub.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center justify-between gap-1">
+                                                                    <div>
+                                                                        <span className="text-xs font-black text-slate-900 tracking-wide uppercase">
+                                                                            {sub.nombre}
+                                                                        </span>
+                                                                        <span className="ml-2 text-[11px] font-bold text-[#16A6A1] bg-teal-50 border border-teal-200 px-1.5 py-0.2 rounded">
+                                                                            {Number(sub.peso || 0).toFixed(1)}%
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openEditSubModal(sub)}
+                                                                            className="text-slate-400 hover:text-[#315d7a] p-1 cursor-pointer"
+                                                                            title="Editar Dimensión y Peso"
+                                                                        >
+                                                                            <Icon name="pencil" className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteSubcomponente(sub.id)}
+                                                                            className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                                                                            title="Eliminar Dimensión"
+                                                                        >
+                                                                            <Icon name="trash" className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {sub.descripcion && (
+                                                                    <p className="text-[11px] text-slate-400 truncate mt-0.5">{sub.descripcion}</p>
+                                                                )}
+
+                                                                {/* Chips de Criterios (con peso y botón editar/eliminar) */}
+                                                                <div className="pt-2">
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                                                        Criterios ({criteriosList.length}):
+                                                                    </span>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {criteriosList.map((crit) => (
+                                                                            <span
+                                                                                key={crit.id}
+                                                                                className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded shadow-2xs group"
+                                                                            >
+                                                                                <span title={crit.nombre || crit.codigo}>{crit.codigo}</span>
+                                                                                <span className="text-[9px] font-sans font-semibold text-teal-700 bg-teal-50 px-1 rounded">
+                                                                                    {Number(crit.peso || 0).toFixed(0)}%
+                                                                                </span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => openEditCriterioModal(sub, crit)}
+                                                                                    className="text-slate-300 hover:text-[#315d7a] ml-0.5 cursor-pointer"
+                                                                                    title="Editar Criterio"
+                                                                                >
+                                                                                    ✎
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleDeleteCriterio(crit.id)}
+                                                                                    className="text-slate-300 hover:text-rose-500 cursor-pointer"
+                                                                                    title="Eliminar Criterio"
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Acciones del Subcomponente */}
+                                                            <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1">
+                                                                {criteriosList.length === 0 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleGenerarCriteriosDefecto(sub.id)}
+                                                                        className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                                                                    >
+                                                                        + Auto C1-C4
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openCreateCriterioModal(sub)}
+                                                                    className="text-[11px] font-bold text-[#315d7a] hover:underline cursor-pointer ml-auto"
+                                                                >
+                                                                    + Criterio
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
-                                            <p className="text-xs text-slate-400 italic bg-slate-50 border border-dashed border-slate-200 p-3 rounded-xl text-center">
-                                                No hay subcomponentes asignados a este logro aún.
-                                            </p>
+                                            <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
+                                                <p className="text-xs text-slate-400 italic">
+                                                    No hay dimensiones configuradas para este logro.
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
-
                                 </div>
                             );
                         })}
@@ -338,7 +536,6 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                         </p>
                     </div>
                 )}
-
             </div>
 
             {/* MODAL CREAR / EDITAR LOGRO */}
@@ -348,7 +545,6 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                         <h3 className="text-base font-bold text-slate-900">
                             {editingLogro ? 'Editar Logro de Aprendizaje' : 'Registrar Nuevo Logro'}
                         </h3>
-                        
                         <form onSubmit={handleSaveLogro} className="space-y-3">
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">Nombre del Logro *</label>
@@ -357,7 +553,7 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                     required
                                     value={dataLogro.nombre}
                                     onChange={(e) => setDataLogro('nombre', e.target.value)}
-                                    placeholder="Ej. Logro 1: Aplica pruebas serológicas..."
+                                    placeholder="Ej. Indicador 1: Fundamentos..."
                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
                                 />
                                 {errorsLogro.nombre && <p className="text-[11px] text-rose-500 mt-1">{errorsLogro.nombre}</p>}
@@ -369,27 +565,23 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                     rows={3}
                                     value={dataLogro.descripcion}
                                     onChange={(e) => setDataLogro('descripcion', e.target.value)}
-                                    placeholder="Detalles sobre las competencias a evaluar..."
+                                    placeholder="Detalles del logro..."
                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
                                 />
-                                {errorsLogro.descripcion && <p className="text-[11px] text-rose-500 mt-1">{errorsLogro.descripcion}</p>}
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setModalLogro(false);
-                                        setEditingLogro(null);
-                                    }}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                                    onClick={() => { setModalLogro(false); setEditingLogro(null); }}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={processingLogro}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#315d7a] hover:bg-[#254860] disabled:opacity-50"
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#315d7a] hover:bg-[#254860] disabled:opacity-50 cursor-pointer"
                                 >
                                     {editingLogro ? 'Actualizar Logro' : 'Guardar Logro'}
                                 </button>
@@ -399,39 +591,39 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                 </div>
             )}
 
-            {/* MODAL CREAR SUBCOMPONENTE */}
-            {selectedLogroForSub && (
+            {/* MODAL CREAR / EDITAR SUBCOMPONENTE (DIMENSIÓN) */}
+            {modalSub && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
                     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
                         <h3 className="text-base font-bold text-slate-900">
-                            Agregar Criterio a: <span className="text-[#315d7a]">{selectedLogroForSub.nombre}</span>
+                            {editingSub ? `Editar Dimensión: ${editingSub.nombre}` : `Agregar Dimensión a: ${selectedLogroForSub?.nombre}`}
                         </h3>
-
-                        <form onSubmit={handleStoreSubcomponente} className="space-y-3">
+                        <form onSubmit={handleSaveSubcomponente} className="space-y-3">
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1">Nombre del Criterio *</label>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Nombre de la Dimensión *</label>
                                 <input
                                     type="text"
                                     required
                                     value={dataSub.nombre}
                                     onChange={(e) => setDataSub('nombre', e.target.value)}
-                                    placeholder="Ej. Examen Teórico, Práctica de Laboratorio..."
+                                    placeholder="Ej. ACTITUDINAL, CONCEPTUAL, PROCEDIMENTAL..."
                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
                                 />
                                 {errorsSub.nombre && <p className="text-[11px] text-rose-500 mt-1">{errorsSub.nombre}</p>}
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1">Peso / Porcentaje (%) *</label>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Peso Ponderado (%) *</label>
                                 <input
                                     type="number"
-                                    required
-                                    min="1"
+                                    step="0.01"
+                                    min="0"
                                     max="100"
+                                    required
                                     value={dataSub.peso}
                                     onChange={(e) => setDataSub('peso', e.target.value)}
-                                    placeholder="Ej. 40"
-                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
+                                    placeholder="Ej. 33.33 o 50"
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none font-bold focus:border-[#315d7a]"
                                 />
                                 {errorsSub.peso && <p className="text-[11px] text-rose-500 mt-1">{errorsSub.peso}</p>}
                             </div>
@@ -445,23 +637,22 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                                     placeholder="Opcional..."
                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
                                 />
-                                {errorsSub.descripcion && <p className="text-[11px] text-rose-500 mt-1">{errorsSub.descripcion}</p>}
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedLogroForSub(null)}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                                    onClick={() => { setModalSub(false); setEditingSub(null); setSelectedLogroForSub(null); }}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={processingSub}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#315d7a] hover:bg-[#254860] disabled:opacity-50"
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#315d7a] hover:bg-[#254860] disabled:opacity-50 cursor-pointer"
                                 >
-                                    Guardar Criterio
+                                    {editingSub ? 'Actualizar Dimensión' : 'Guardar Dimensión'}
                                 </button>
                             </div>
                         </form>
@@ -469,6 +660,73 @@ export default function LogrosIndex({ curso, seccion, periodo, logros = [], filt
                 </div>
             )}
 
+            {/* MODAL CREAR / EDITAR CRITERIO INDIVIDUAL */}
+            {modalCriterio && selectedSubForCrit && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm p-6 space-y-4">
+                        <h3 className="text-base font-bold text-slate-900">
+                            {editingCriterio ? `Editar Criterio ${editingCriterio.codigo}` : `Nuevo Criterio en: ${selectedSubForCrit.nombre}`}
+                        </h3>
+
+                        <form onSubmit={handleSaveCriterio} className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Código *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={criterioForm.codigo}
+                                        onChange={(e) => setCriterioForm({ ...criterioForm, codigo: e.target.value })}
+                                        placeholder="Ej: C1, C2"
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-mono font-bold uppercase outline-none focus:border-[#315d7a]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Peso (%) *</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        required
+                                        value={criterioForm.peso}
+                                        onChange={(e) => setCriterioForm({ ...criterioForm, peso: e.target.value })}
+                                        placeholder="Ej: 25"
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold outline-none focus:border-[#315d7a]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Descripción / Instrumento</label>
+                                <input
+                                    type="text"
+                                    value={criterioForm.nombre}
+                                    onChange={(e) => setCriterioForm({ ...criterioForm, nombre: e.target.value })}
+                                    placeholder="Ej: Examen escrito, Rúbrica..."
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-[#315d7a]"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setModalCriterio(false); setEditingCriterio(null); }}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#315d7a] hover:bg-[#254860] cursor-pointer"
+                                >
+                                    {editingCriterio ? 'Actualizar Criterio' : 'Guardar Criterio'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }

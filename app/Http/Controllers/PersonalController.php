@@ -6,7 +6,9 @@ use App\Models\Area;
 use App\Models\Personal;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\DeColectaService;
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,16 @@ use RuntimeException;
 
 class PersonalController extends Controller
 {
+    protected DeColectaService $deColectaService;
+
+    public function __construct(DeColectaService $deColectaService)
+    {
+        $this->deColectaService = $deColectaService;
+    }
+
+    /**
+     * Renderizado inicial de la vista Inertia.
+     */
     public function index(Request $request): Response
     {
         $buscar = trim((string) $request->input('buscar', ''));
@@ -66,13 +78,66 @@ class PersonalController extends Controller
 
         return Inertia::render('Personal/Index', [
             'personal' => $personal,
-            'areas' => $this->areasDisponibles(),
-            'filtros' => [
-                'buscar' => $buscar,
-                'estado' => $estado,
+            'areas'    => $this->areasDisponibles(),
+            'filtros'  => [
+                'buscar'  => $buscar,
+                'estado'  => $estado,
                 'area_id' => $areaId,
             ],
         ]);
+    }
+
+    /**
+     * Endpoint exclusivo de búsqueda AJAX para filtrado dinámico en tiempo real (Index.jsx).
+     */
+    public function buscarAjax(Request $request): JsonResponse
+    {
+        $buscar = trim((string) $request->input('buscar', ''));
+        $estado = trim((string) $request->input('estado', ''));
+        $areaId = $request->input('area_id');
+
+        $personal = Personal::query()
+            ->with([
+                'usuario.roles',
+                'usuario.areas',
+                'area',
+            ])
+            ->when($buscar !== '', function ($query) use ($buscar): void {
+                $query->where(function ($subquery) use ($buscar): void {
+                    $subquery
+                        ->where('dni', 'like', "%{$buscar}%")
+                        ->orWhere('nombre', 'like', "%{$buscar}%")
+                        ->orWhere('apellido', 'like', "%{$buscar}%")
+                        ->orWhere('email', 'like', "%{$buscar}%")
+                        ->orWhere('puesto', 'like', "%{$buscar}%")
+                        ->orWhereHas(
+                            'usuario',
+                            fn ($usuario) => $usuario->where('username', 'like', "%{$buscar}%")
+                        );
+                });
+            })
+            ->when($estado !== '', fn ($query) => $query->whereHas('usuario', fn ($u) => $u->where('status', $estado)))
+            ->when(filled($areaId), fn ($query) => $query->where('id_area', $areaId))
+            ->orderByDesc('fecha_creacion')
+            ->paginate(10);
+
+        return response()->json($personal);
+    }
+
+    /**
+     * Consulta interna a RENIEC para autocompletado en el formulario de personal.
+     */
+    public function consultarDni(string $dni): JsonResponse
+    {
+        if (strlen($dni) !== 8 || !ctype_digit($dni)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El DNI debe contener exactamente 8 dígitos.',
+            ], 422);
+        }
+
+        $resultado = $this->deColectaService->consultarDni($dni);
+        return response()->json($resultado, $resultado['success'] ? 200 : 400);
     }
 
     public function create(): Response
@@ -89,26 +154,22 @@ class PersonalController extends Controller
 
         DB::transaction(function () use ($datos): void {
             $usuario = Usuario::create([
-                'username' => trim($datos['username']),
+                'username'      => trim($datos['username']),
                 'password_hash' => Hash::make($datos['password']),
-                'status' => $datos['status'],
-                'img' => $this->normalizarNullable($datos['img'] ?? null),
+                'status'        => $datos['status'],
+                'img'           => $this->normalizarNullable($datos['img'] ?? null),
             ]);
 
             Personal::create([
-                'usuario_id' => $usuario->id,
-                'dni' => trim($datos['dni']),
-                'nombre' => trim($datos['nombre']),
-                'apellido' => trim($datos['apellido']),
-                'direccion' => $this->normalizarNullable(
-                    $datos['direccion'] ?? null
-                ),
-                'telefono' => $this->normalizarNullable(
-                    $datos['telefono'] ?? null
-                ),
-                'email' => mb_strtolower(trim($datos['email'])),
-                'puesto' => trim($datos['puesto']),
-                'id_area' => (int) $datos['id_area'],
+                'usuario_id'     => $usuario->id,
+                'dni'            => trim($datos['dni']),
+                'nombre'         => trim($datos['nombre']),
+                'apellido'       => trim($datos['apellido']),
+                'direccion'      => $this->normalizarNullable($datos['direccion'] ?? null),
+                'telefono'       => $this->normalizarNullable($datos['telefono'] ?? null),
+                'email'          => mb_strtolower(trim($datos['email'])),
+                'puesto'         => trim($datos['puesto']),
+                'id_area'        => (int) $datos['id_area'],
                 'fecha_creacion' => now(),
             ]);
 
@@ -142,8 +203,8 @@ class PersonalController extends Controller
 
         return Inertia::render('Personal/Edit', [
             'personal' => $this->personalData($personal),
-            'roles' => $this->rolesDisponibles(),
-            'areas' => $this->areasDisponibles(),
+            'roles'    => $this->rolesDisponibles(),
+            'areas'    => $this->areasDisponibles(),
         ]);
     }
 
@@ -166,8 +227,8 @@ class PersonalController extends Controller
 
             $usuario->update([
                 'username' => trim($datos['username']),
-                'status' => $datos['status'],
-                'img' => $this->normalizarNullable($datos['img'] ?? null),
+                'status'   => $datos['status'],
+                'img'      => $this->normalizarNullable($datos['img'] ?? null),
             ]);
 
             if (! empty($datos['password'])) {
@@ -177,18 +238,14 @@ class PersonalController extends Controller
             }
 
             $personal->update([
-                'dni' => trim($datos['dni']),
-                'nombre' => trim($datos['nombre']),
-                'apellido' => trim($datos['apellido']),
-                'direccion' => $this->normalizarNullable(
-                    $datos['direccion'] ?? null
-                ),
-                'telefono' => $this->normalizarNullable(
-                    $datos['telefono'] ?? null
-                ),
-                'email' => mb_strtolower(trim($datos['email'])),
-                'puesto' => trim($datos['puesto']),
-                'id_area' => (int) $datos['id_area'],
+                'dni'       => trim($datos['dni']),
+                'nombre'    => trim($datos['nombre']),
+                'apellido'  => trim($datos['apellido']),
+                'direccion' => $this->normalizarNullable($datos['direccion'] ?? null),
+                'telefono'  => $this->normalizarNullable($datos['telefono'] ?? null),
+                'email'     => mb_strtolower(trim($datos['email'])),
+                'puesto'    => trim($datos['puesto']),
+                'id_area'   => (int) $datos['id_area'],
             ]);
 
             $usuario->roles()->sync(
@@ -248,10 +305,6 @@ class PersonalController extends Controller
 
             $usuario = $personal->usuario;
 
-            /*
-             * Primero se elimina el perfil personal para liberar la FK
-             * personal.usuario_id -> usuarios.id.
-             */
             $personal->delete();
 
             if ($usuario) {
@@ -424,11 +477,11 @@ class PersonalController extends Controller
                 'max:255',
             ],
         ], [
-            'role_ids.required' => 'Debe seleccionar por lo menos un rol.',
-            'role_ids.min' => 'Debe seleccionar por lo menos un rol.',
-            'role_ids.*.exists' => 'Uno de los roles seleccionados no está permitido.',
-            'id_area.required' => 'Debe seleccionar el área principal.',
-            'id_area.exists' => 'El área principal seleccionada no está disponible.',
+            'role_ids.required'  => 'Debe seleccionar por lo menos un rol.',
+            'role_ids.min'       => 'Debe seleccionar por lo menos un rol.',
+            'role_ids.*.exists'  => 'Uno de los roles seleccionados no está permitido.',
+            'id_area.required'   => 'Debe seleccionar el área principal.',
+            'id_area.exists'     => 'El área principal seleccionada no está disponible.',
             'password.confirmed' => 'La confirmación de contraseña no coincide.',
         ]);
     }
@@ -541,15 +594,15 @@ class PersonalController extends Controller
         Personal $personal
     ): array {
         return [
-            'id' => $personal->id,
-            'dni' => $personal->dni,
-            'nombre' => $personal->nombre,
-            'apellido' => $personal->apellido,
+            'id'        => $personal->id,
+            'dni'       => $personal->dni,
+            'nombre'    => $personal->nombre,
+            'apellido'  => $personal->apellido,
             'direccion' => $personal->direccion,
-            'telefono' => $personal->telefono,
-            'email' => $personal->email,
-            'puesto' => $personal->puesto,
-            'id_area' => $personal->id_area,
+            'telefono'  => $personal->telefono,
+            'email'     => $personal->email,
+            'puesto'    => $personal->puesto,
+            'id_area'   => $personal->id_area,
 
             'role_ids' => $personal->usuario
                 ? $personal->usuario->roles
@@ -568,10 +621,10 @@ class PersonalController extends Controller
                 : [],
 
             'usuario' => [
-                'id' => $personal->usuario?->id,
+                'id'       => $personal->usuario?->id,
                 'username' => $personal->usuario?->username,
-                'status' => $personal->usuario?->status,
-                'img' => $personal->usuario?->img,
+                'status'   => $personal->usuario?->status,
+                'img'      => $personal->usuario?->img,
             ],
         ];
     }

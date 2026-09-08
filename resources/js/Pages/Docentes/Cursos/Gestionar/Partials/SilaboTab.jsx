@@ -8,7 +8,7 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
     const [archivo, setArchivo] = useState(null);
     const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
 
-    // Cargar el sílabo actual al montar el componente o cambiar de contexto
+    // Cargar el sílabo actual al montar o cambiar de contexto
     const cargarSilabo = async () => {
         setLoading(true);
         try {
@@ -16,8 +16,8 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                 params: {
                     curso_id: cursoId,
                     seccion_id: seccionId,
-                    periodo_id: periodoId
-                }
+                    periodo_id: periodoId,
+                },
             });
             if (response.data.success) {
                 setSilabo(response.data.silabo);
@@ -35,7 +35,7 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
         }
     }, [cursoId, seccionId, periodoId]);
 
-    // Manejar subida/reemplazo de sílabo
+    // Subir o reemplazar sílabo
     const handleGuardar = async (e) => {
         e.preventDefault();
         if (!archivo) {
@@ -53,14 +53,14 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
         setMensaje({ tipo: '', texto: '' });
 
         try {
-            const response = await axios.post('/docente/silabos/guardar', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+            await axios.post('/docente/silabos/guardar', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
             });
 
-            setMensaje({ tipo: 'exito', texto: 'Sílabo subido correctamente.' });
+            setMensaje({ tipo: 'exito', texto: 'Sílabo subido y estudiantes notificados correctamente.' });
             setArchivo(null);
-            // Resetear el input file
-            document.getElementById('silabo-input-file').value = '';
+            const input = document.getElementById('silabo-input-file');
+            if (input) input.value = '';
             cargarSilabo();
         } catch (error) {
             const errorMsg = error.response?.data?.message || 'Error al subir el archivo.';
@@ -70,15 +70,25 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
         }
     };
 
-    // Eliminar el sílabo actual
+    // Eliminar sílabo
     const handleEliminar = async (idSilabo) => {
+        if (!idSilabo) {
+            setMensaje({ tipo: 'error', texto: 'ID del sílabo no válido.' });
+            return;
+        }
+
         if (!confirm('¿Está seguro de eliminar el sílabo de esta sección?')) return;
 
         try {
-            await axios.delete(`/docente/silabos/eliminar/${idSilabo}`);
-            setMensaje({ tipo: 'exito', texto: 'Sílabo eliminado exitosamente.' });
-            setSilabo(null);
+            const response = await axios.delete(`/docente/silabos/eliminar/${idSilabo}`);
+            if (response.data.success || response.status === 200) {
+                setMensaje({ tipo: 'exito', texto: 'Sílabo eliminado exitosamente.' });
+                setSilabo(null);
+                const input = document.getElementById('silabo-input-file');
+                if (input) input.value = '';
+            }
         } catch (error) {
+            console.error('Error al eliminar:', error);
             setMensaje({ tipo: 'error', texto: 'Error al eliminar el sílabo.' });
         }
     };
@@ -86,10 +96,16 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
     if (loading) {
         return (
             <div className="p-6 text-center text-gray-500">
-                <i className="fas fa-spinner fa-spin mr-2"></i> Cargando sílabo...
+                <svg className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Cargando sílabo...
             </div>
         );
     }
+
+    const silaboId = silabo?.id_silabo || silabo?.id;
 
     return (
         <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200">
@@ -100,16 +116,20 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                 Sílabo de la Unidad Didáctica
             </h3>
 
-            {/* Alertas de Feedback */}
+            {/* Alertas */}
             {mensaje.texto && (
-                <div className={`p-3 mb-4 text-sm rounded-md ${
-                    mensaje.tipo === 'exito' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+                <div
+                    className={`p-3 mb-4 text-sm rounded-md ${
+                        mensaje.tipo === 'exito'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
+                >
                     {mensaje.texto}
                 </div>
             )}
 
-            {/* Vista cuando EXISTE un sílabo */}
+            {/* Vista Sílabo Existente */}
             {silabo ? (
                 <div className="border rounded-lg p-4 bg-gray-50 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -134,9 +154,8 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Botón Ver / Descargar */}
                         <a
-                            href={`/docente/silabos/ver/${silabo.id_silabo}`}
+                            href={`/docente/silabos/ver/${silaboId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
@@ -148,11 +167,10 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                             Ver Sílabo
                         </a>
 
-                        {/* Botón Eliminar */}
                         <button
                             type="button"
-                            onClick={() => handleEliminar(silabo.id_silabo)}
-                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 border border-red-200 transition-colors"
+                            onClick={() => handleEliminar(silaboId)}
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
                         >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -167,7 +185,7 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                 </div>
             )}
 
-            {/* Formulario para Subir o Reemplazar */}
+            {/* Formulario */}
             <form onSubmit={handleGuardar} className="border-t pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     {silabo ? 'Reemplazar Sílabo' : 'Subir Nuevo Sílabo (PDF o Word, máx. 10MB)'}
@@ -185,7 +203,7 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                     <button
                         type="submit"
                         disabled={uploading}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors whitespace-nowrap cursor-pointer"
                     >
                         {uploading ? (
                             <>
@@ -195,8 +213,10 @@ export default function SilaboTab({ cursoId, seccionId, periodoId }) {
                                 </svg>
                                 Guardando...
                             </>
+                        ) : silabo ? (
+                            'Reemplazar File'
                         ) : (
-                            silabo ? 'Reemplazar File' : 'Subir Archivo'
+                            'Subir Archivo'
                         )}
                     </button>
                 </div>

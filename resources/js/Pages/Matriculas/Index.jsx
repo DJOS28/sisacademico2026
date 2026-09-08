@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 
 export default function Index({
     matriculas: matriculasIniciales,
@@ -18,8 +19,18 @@ export default function Index({
     const [estado, setEstado] = useState(filtros.estado ?? '');
     const [cargando, setCargando] = useState(false);
 
+    // Estado del modal de importación
+    const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
+
+    // Formulario reactivo para la importación
+    const { data: formImport, setData: setFormImport, post: postImport, processing: importando, errors: erroresImport, reset: resetFormImport } = useForm({
+        periodo_id: periodos.find(p => p.activo)?.id ?? (periodos[0]?.id ?? ''),
+        archivo: null,
+    });
+
     const primeraCarga = useRef(true);
     const controladorFiltro = useRef(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         setMatriculas(matriculasIniciales);
@@ -134,7 +145,6 @@ export default function Index({
         return clases[estadoActual] ?? 'bg-slate-100 text-slate-700';
     };
 
-    // FUNCIÓN PARA ELIMINAR MATRÍCULA
     const eliminarMatricula = (matricula) => {
         const nombreEstudiante = matricula.postulante 
             ? `${matricula.postulante.nombres} ${matricula.postulante.apellidos}`
@@ -142,7 +152,7 @@ export default function Index({
 
         Swal.fire({
             title: '¿Eliminar Matrícula?',
-            html: `Está a punto de remover la matrícula <strong>${matricula.codigo_matricula ?? ''}</strong> de <strong>${nombreEstudiante}</strong>. Se eliminará también su carga horaria asociada.`,
+            html: `Está a punto de remover la matrícula <strong>${matricula.codigo_matricula ?? ''}</strong> de <strong>${nombreEstudiante}</strong>. Se eliminará también su carga horaria asociada y la sincronización con Moodle.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc2626',
@@ -177,6 +187,73 @@ export default function Index({
         });
     };
 
+    // GENERAR Y DESCARGAR PLANTILLA EXCEL (ENFOQUE 2)
+    const descargarPlantillaExcel = () => {
+        const dataPlantilla = [
+            ['DNI_ESTUDIANTE', 'CODIGO_CURSO', 'SECCION', 'TURNO', 'CONDICION'],
+            ['70140514', 'CUR-001', 'A', 'Mañana', 'Inscrito'],
+            ['70140514', 'CUR-002', 'A', 'Mañana', 'Inscrito'],
+            ['60128237', 'CUR-001', 'B', 'Noche', 'Repitencia'],
+            ['60128237', 'CUR-003', 'A', 'Mañana', 'Cargo'],
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(dataPlantilla);
+        ws['!cols'] = [
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 12 },
+            { wch: 14 },
+            { wch: 16 },
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Plantilla_Matricula');
+        XLSX.writeFile(wb, 'Plantilla_Matricula_Masiva.xlsx');
+    };
+
+    // PROCESAR FORMULARIO DE IMPORTACIÓN
+    const handleSubirArchivoMasivo = (e) => {
+        e.preventDefault();
+
+        if (!formImport.archivo) {
+            Swal.fire('Atención', 'Debe seleccionar un archivo Excel para continuar.', 'warning');
+            return;
+        }
+
+        postImport(route('matriculas.importar_masivo'), {
+            preserveScroll: true,
+            onStart: () => {
+                Swal.fire({
+                    title: 'Procesando matrículas...',
+                    text: 'Registrando estudiantes y sincronizando con Moodle...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading(),
+                    customClass: { popup: 'rounded-2xl' },
+                });
+            },
+            onSuccess: () => {
+                setModalImportarAbierto(false);
+                resetFormImport();
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Proceso Finalizado!',
+                    text: 'Las matrículas y grupos de Moodle se han sincronizado correctamente.',
+                    customClass: { popup: 'rounded-2xl' },
+                });
+            },
+            onError: (err) => {
+                const msg = err.error || 'Ocurrió un inconveniente al procesar el archivo.';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error en la importación',
+                    text: msg,
+                    customClass: { popup: 'rounded-2xl' },
+                });
+            }
+        });
+    };
+
     return (
         <AuthenticatedLayout
             header={
@@ -185,12 +262,27 @@ export default function Index({
                         <h1 className="text-2xl font-bold text-slate-900">Matrículas Académicas</h1>
                         <p className="mt-1 text-sm text-slate-500">Gestione las cargas académicas, periodos y estados de matrícula.</p>
                     </div>
-                    <Link
-                        href={route('matriculas.create')}
-                        className="flex h-[42px] items-center justify-center rounded-lg bg-[#315d7a] px-4 text-sm font-semibold text-white transition hover:bg-[#274b63]"
-                    >
-                        Nueva matrícula
-                    </Link>
+                    
+                    {/* BOTONES DE ACCIÓN */}
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={() => setModalImportarAbierto(true)}
+                            className="flex h-[42px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 shadow-xs cursor-pointer"
+                        >
+                            <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <span>Importación Masiva</span>
+                        </button>
+
+                        <Link
+                            href={route('matriculas.create')}
+                            className="flex h-[42px] items-center justify-center rounded-lg bg-[#315d7a] px-4 text-sm font-semibold text-white transition hover:bg-[#274b63] shadow-xs cursor-pointer"
+                        >
+                            Nueva matrícula
+                        </Link>
+                    </div>
                 </div>
             }
         >
@@ -317,7 +409,6 @@ export default function Index({
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end items-center gap-1.5">
-                                                {/* BOTÓN VER FICHA DE MATRÍCULA (PDF) */}
                                                 <a
                                                     href={route('matriculas.ficha', matricula.id)}
                                                     target="_blank"
@@ -331,7 +422,6 @@ export default function Index({
                                                     </svg>
                                                 </a>
 
-                                                {/* BOTÓN EDITAR */}
                                                 <Link
                                                     href={route('matriculas.edit', matricula.id)}
                                                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 shadow-sm"
@@ -342,7 +432,6 @@ export default function Index({
                                                     </svg>
                                                 </Link>
 
-                                                {/* BOTÓN ELIMINAR */}
                                                 <button
                                                     type="button"
                                                     onClick={() => eliminarMatricula(matricula)}
@@ -369,7 +458,7 @@ export default function Index({
                     </table>
                 </div>
 
-                {/* PAGINACIÓN COMPATIBLE */}
+                {/* PAGINACIÓN */}
                 {matriculas.total > 0 && (
                     <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-slate-500">
@@ -418,6 +507,138 @@ export default function Index({
                     </div>
                 )}
             </div>
+
+            {/* MODAL DE IMPORTACIÓN MASIVA Y DESCARGA DE PLANTILLA */}
+            {modalImportarAbierto && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                    <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl transition-all border border-slate-200">
+                        
+                        {/* Cabecera del Modal */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900">Importación Masiva de Matrículas</h3>
+                                    <p className="text-xs text-slate-500">Cargue asignaturas por lote y sincronice el Aula Virtual en bloque.</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setModalImportarAbierto(false)}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+                            >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubirArchivoMasivo} className="mt-4 space-y-4">
+                            {/* Paso 1: Descargar Plantilla Oficial */}
+                            <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-bold text-sky-900">1. Descargar Formato Oficial</p>
+                                    <p className="text-[11px] text-sky-700 mt-0.5">
+                                        Plantilla preconfigurada con las columnas obligatorias del sistema.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={descargarPlantillaExcel}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-xs shrink-0 cursor-pointer"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    <span>Descargar Plantilla (.xlsx)</span>
+                                </button>
+                            </div>
+
+                            {/* Instrucciones de llenado */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-600 space-y-2">
+                                <p className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                                    Instrucciones para el llenado del archivo:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-600">
+                                    <li><strong>DNI_ESTUDIANTE:</strong> DNI del alumno (debe estar registrado previamente como postulante/estudiante).</li>
+                                    <li><strong>CODIGO_CURSO:</strong> Código del curso (ej: <code className="text-[#315d7a] font-bold">CUR-001</code> o simplemente <code className="text-[#315d7a] font-bold">1</code>).</li>
+                                    <li><strong>SECCION:</strong> Sección programada en el horario (ej: <code className="font-bold">A</code>, <code className="font-bold">B</code>).</li>
+                                    <li><strong>TURNO:</strong> Turno correspondiente (ej: <code className="font-bold">Mañana</code>, <code className="font-bold">Noche</code>).</li>
+                                    <li><strong>CONDICION:</strong> Estado de la asignatura (<code className="text-emerald-700 font-bold">Inscrito</code>, <code className="text-purple-700 font-bold">Repitencia</code>, o <code className="text-amber-700 font-bold">Cargo</code>).</li>
+                                </ul>
+                            </div>
+
+                            {/* Selección de Periodo */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                    Periodo Lectivo de Destino:
+                                </label>
+                                <select
+                                    value={formImport.periodo_id}
+                                    onChange={(e) => setFormImport('periodo_id', e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-[#315d7a]"
+                                >
+                                    {periodos.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.nombre} {p.activo ? '(Activo)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {erroresImport.periodo_id && (
+                                    <p className="mt-1 text-[11px] text-rose-600">{erroresImport.periodo_id}</p>
+                                )}
+                            </div>
+
+                            {/* Selector de Archivo Excel */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                    Seleccionar Archivo Completado (.xlsx, .xls, .csv):
+                                </label>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    accept=".xlsx, .xls, .csv"
+                                    onChange={(e) => setFormImport('archivo', e.target.files?.[0] || null)}
+                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#315d7a]/10 file:text-[#315d7a] hover:file:bg-[#315d7a]/20 cursor-pointer border border-slate-300 rounded-xl p-1 bg-white"
+                                />
+                                {erroresImport.archivo && (
+                                    <p className="mt-1 text-[11px] text-rose-600">{erroresImport.archivo}</p>
+                                )}
+                            </div>
+
+                            {/* Botones de Acción */}
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setModalImportarAbierto(false)}
+                                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={importando || !formImport.archivo}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-[#315d7a] px-4 py-2 text-xs font-bold text-white hover:bg-[#274b63] transition disabled:opacity-50 cursor-pointer shadow-xs"
+                                >
+                                    {importando ? (
+                                        <>
+                                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                            <span>Importando...</span>
+                                        </>
+                                    ) : (
+                                        <span>Procesar Importación</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }

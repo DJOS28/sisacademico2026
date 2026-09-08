@@ -29,6 +29,8 @@
         "lucide-react": "^1.24.0",
         "react-chartjs-2": "^5.3.1",
         "react-select": "^5.10.2",
-        "sweetalert2": "^11.26.25"
+        "recharts": "^3.10.1",
+        "sweetalert2": "^11.26.25",
+        "xlsx": "^0.18.5"
     }
 }

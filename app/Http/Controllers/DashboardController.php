@@ -6,7 +6,6 @@ use App\Models\Periodo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,18 +15,15 @@ class DashboardController extends Controller
     {
         $usuario = $request->user();
 
-        // ==========================================
+        // =========================================================
         // 1. DASHBOARD ESTUDIANTE
-        // ==========================================
+        // =========================================================
         if ($usuario->tieneRol('Estudiante')) {
-            // Obtener el registro de la tabla postulantes vinculado al usuario
             $estudiante = DB::table('postulantes')
                 ->where('usuario_id', $usuario->id)
                 ->first();
 
             $estudianteId = $estudiante?->id_postulante;
-
-            // Obtener el Periodo Activo
             $periodoActivo = Periodo::where('activo', 1)->first();
 
             if (!$periodoActivo || !$estudianteId) {
@@ -35,17 +31,16 @@ class DashboardController extends Controller
                     'dashboardType' => 'estudiante',
                     'periodo'       => $periodoActivo->nombre ?? 'Sin periodo activo',
                     'summary'       => [
-                        'total_cursos'    => 0,
-                        'promedio_general' => '00.00',
+                        'total_cursos'          => 0,
+                        'promedio_general'      => '00.00',
                         'porcentaje_asistencia' => '0%',
-                        'pagos_realizados' => '0',
+                        'pagos_realizados'      => '0',
                     ],
                     'todaySchedule' => [],
                     'announcements' => [],
                 ]);
             }
 
-            // Matrícula activa del estudiante en el periodo actual
             $matriculaActiva = DB::table('matriculas')
                 ->where('postulante_id', $estudianteId)
                 ->where('periodo_id', $periodoActivo->id)
@@ -55,22 +50,16 @@ class DashboardController extends Controller
             $totalCursos = 0;
             $todaySchedule = collect();
             $porcentajeAsistencia = 100;
+            $planEstudioId = $matriculaActiva?->plan_estudio_id;
 
             if ($matriculaActiva) {
-                // Total Cursos Matriculados
                 $totalCursos = DB::table('matricula_cursos')
                     ->where('matricula_id', $matriculaActiva->id)
                     ->count();
 
-                // Horario de Hoy
                 $diasEnum = [
-                    1 => 'Lunes',
-                    2 => 'Martes',
-                    3 => 'Miércoles',
-                    4 => 'Jueves',
-                    5 => 'Viernes',
-                    6 => 'Sábado',
-                    7 => 'Domingo',
+                    1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles',
+                    4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'
                 ];
                 $diaHoy = $diasEnum[Carbon::now()->dayOfWeekIso] ?? 'Lunes';
 
@@ -93,19 +82,13 @@ class DashboardController extends Controller
                     )
                     ->orderBy('h.hora_inicio', 'asc')
                     ->get()
-                    ->map(function ($item) {
-                        $aula = $item->aula_nombre ? "Aula: {$item->aula_nombre}" . ($item->numero_aula ? " ({$item->numero_aula})" : '') : 'Aula no asignada';
-                        $docente = $item->docente_nombre ? " • Prof. {$item->docente_nombre}" : '';
-                        
-                        return [
-                            'time'   => Carbon::parse($item->hora_inicio)->format('H:i') . ' - ' . Carbon::parse($item->hora_fin)->format('H:i'),
-                            'title'  => $item->curso_nombre,
-                            'detail' => "{$aula}{$docente}",
-                            'status' => 'Programado',
-                        ];
-                    });
+                    ->map(fn($item) => [
+                        'time'   => Carbon::parse($item->hora_inicio)->format('H:i') . ' - ' . Carbon::parse($item->hora_fin)->format('H:i'),
+                        'title'  => $item->curso_nombre,
+                        'detail' => ($item->aula_nombre ? "Aula: {$item->aula_nombre}" : 'Aula sin asignar') . ($item->docente_nombre ? " • Prof. {$item->docente_nombre}" : ''),
+                        'status' => 'Programado',
+                    ]);
 
-                // Cálculo Porcentaje Asistencia Global del Periodo
                 $asistenciasCount = DB::table('asistencias as a')
                     ->join('matricula_cursos as mc', 'mc.id', '=', 'a.matricula_curso_id')
                     ->where('mc.matricula_id', $matriculaActiva->id)
@@ -120,38 +103,35 @@ class DashboardController extends Controller
                 }
             }
 
-            // Promedio Acumulado / Promedio General
             $promedioAcumulado = DB::table('nota_final')
                 ->where('estudiante_id', $estudianteId)
                 ->avg('promedio');
 
             $promedioTexto = $promedioAcumulado ? number_format($promedioAcumulado, 2) : '—';
 
-            // Cantidad de pagos o transacciones registradas
             $pagosCount = DB::table('pagos_postulantes')
                 ->where('postulante_id', $estudianteId)
                 ->where('estado', 'aceptado')
                 ->count();
 
-            // Anuncios Institucionales para el Plan de Estudio del estudiante
-            $planEstudioId = $matriculaActiva->plan_estudio_id ?? null;
-
-            $announcementsQuery = DB::table('anuncios')
-                ->where('activo', 1);
+            // =========================================================================
+            // ANUNCIOS FILTRADOS POR PLAN DE ESTUDIO DEL ALUMNO MATRICULADO
+            // =========================================================================
+            $announcements = collect();
 
             if ($planEstudioId) {
-                $announcementsQuery->where('plan_estudio_id', $planEstudioId);
+                $announcements = DB::table('anuncios')
+                    ->where('activo', 1)
+                    ->where('plan_estudio_id', $planEstudioId)
+                    ->orderByDesc('created_at')
+                    ->limit(4)
+                    ->get()
+                    ->map(fn($ann) => [
+                        'title'  => $ann->titulo,
+                        'detail' => $ann->contenido,
+                        'date'   => Carbon::parse($ann->created_at)->diffForHumans(),
+                    ]);
             }
-
-            $announcements = $announcementsQuery
-                ->orderBy('created_at', 'desc')
-                ->limit(4)
-                ->get()
-                ->map(fn($ann) => [
-                    'title'  => $ann->titulo,
-                    'detail' => $ann->contenido,
-                    'date'   => Carbon::parse($ann->created_at)->diffForHumans(),
-                ]);
 
             return Inertia::render('Dashboard/EstudianteDashboard', [
                 'dashboardType' => 'estudiante',
@@ -167,9 +147,9 @@ class DashboardController extends Controller
             ]);
         }
 
-        // ==========================================
+        // =========================================================
         // 2. DASHBOARD DOCENTE
-        // ==========================================
+        // =========================================================
         if ($usuario->tieneRol('Docente')) {
             $docente = DB::table('docentes')->where('usuario_id', $usuario->id)->first();
             $docenteId = $docente?->id;
@@ -189,14 +169,11 @@ class DashboardController extends Controller
                 ]);
             }
 
-            $cursosDocente = DB::table('horarios as h')
-                ->join('cursos as c', 'c.id', '=', 'h.id_curso')
-                ->leftJoin('secciones as s', 's.id', '=', 'h.id_seccion')
-                ->where('h.id_docente', $docenteId)
-                ->where('h.id_periodo', $periodoActivo->id)
-                ->select('h.id_curso', 'h.id_seccion', 'h.id_turno', 'c.nombre as curso_nombre', 's.nombre as seccion_nombre')
-                ->groupBy('h.id_curso', 'h.id_seccion', 'h.id_turno', 'c.nombre', 's.nombre')
-                ->get();
+            $totalCursos = DB::table('horarios')
+                ->where('id_docente', $docenteId)
+                ->where('id_periodo', $periodoActivo->id)
+                ->distinct('id_curso', 'id_seccion')
+                ->count('id');
 
             $totalEstudiantes = DB::table('matricula_cursos as mc')
                 ->join('horarios as h', 'h.id', '=', 'mc.horario_id')
@@ -218,15 +195,12 @@ class DashboardController extends Controller
                 ->select('h.hora_inicio', 'h.hora_fin', 'c.nombre as curso_nombre', 's.nombre as seccion_nombre', 'a.nombre as aula_nombre', 'a.numero_aula')
                 ->orderBy('h.hora_inicio', 'asc')
                 ->get()
-                ->map(function ($item) {
-                    $aulaTexto = $item->aula_nombre ? " • Aula: {$item->aula_nombre}" . ($item->numero_aula ? " ({$item->numero_aula})" : '') : '';
-                    return [
-                        'time'   => Carbon::parse($item->hora_inicio)->format('H:i') . ' - ' . Carbon::parse($item->hora_fin)->format('H:i'),
-                        'title'  => $item->curso_nombre,
-                        'detail' => "Sección: " . ($item->seccion_nombre ?? 'Única') . $aulaTexto,
-                        'status' => 'Programada',
-                    ];
-                });
+                ->map(fn($item) => [
+                    'time'   => Carbon::parse($item->hora_inicio)->format('H:i') . ' - ' . Carbon::parse($item->hora_fin)->format('H:i'),
+                    'title'  => $item->curso_nombre,
+                    'detail' => "Sección: " . ($item->seccion_nombre ?? 'A') . ($item->aula_nombre ? " • Aula: {$item->aula_nombre}" : ''),
+                    'status' => 'Programada',
+                ]);
 
             $asistenciasPendientes = DB::table('sesiones as s')
                 ->join('horarios as h', 'h.id', '=', 's.horario_id')
@@ -241,7 +215,7 @@ class DashboardController extends Controller
                 'dashboardType' => 'docente',
                 'periodo'       => $periodoActivo->nombre,
                 'summary'       => [
-                    'total_cursos'            => $cursosDocente->count(),
+                    'total_cursos'            => 0,
                     'total_estudiantes'       => $totalEstudiantes,
                     'asistencias_pendientes'  => $asistenciasPendientes,
                     'evaluaciones_pendientes' => 0,
@@ -250,161 +224,119 @@ class DashboardController extends Controller
             ]);
         }
 
-        // ==========================================
+        // =========================================================
         // 3. DASHBOARD ADMINISTRATIVO
-        // ==========================================
-        $periodoActivo = Periodo::where('activo', 1)->first();
+        // =========================================================
+        $periodoActivo = Periodo::where('activo', 1)->first() ?? Periodo::latest('id')->first();
 
-        $safeCount = static function (string $table, ?callable $filter = null): int {
-            if (!Schema::hasTable($table)) {
-                return 0;
-            }
+        $usuariosActivos = DB::table('usuarios')->where('status', 'Disponible')->count();
+        $totalPostulantes = DB::table('postulantes')->count();
+        $matriculadosCount = DB::table('matriculas')
+            ->when($periodoActivo, fn($q) => $q->where('periodo_id', $periodoActivo->id))
+            ->where('estado', 'Matriculado')
+            ->count();
+        $docentesCount = DB::table('docentes')->count();
+        $tituladosCount = DB::table('titulaciones')->where('estado', 'Titulado')->count();
+        $convalidadosCount = DB::table('convalidaciones')->where('estado', 'Aprobado')->count();
 
-            $query = DB::table($table);
-
-            if ($filter) {
-                $filter($query);
-            }
-
-            return $query->count();
-        };
-
-        $usuariosActivos = $safeCount('usuarios', function ($query) {
-            if (Schema::hasColumn('usuarios', 'activo')) {
-                $query->where('activo', 1);
-            } elseif (Schema::hasColumn('usuarios', 'estado')) {
-                $query->whereIn(DB::raw('LOWER(estado)'), ['activo', 'habilitado']);
-            }
-        });
-
-        $totalPostulantes = $safeCount('postulantes');
-
-        $matriculados = $safeCount('matriculas', function ($query) use ($periodoActivo) {
-            if ($periodoActivo && Schema::hasColumn('matriculas', 'periodo_id')) {
-                $query->where('periodo_id', $periodoActivo->id);
-            }
-
-            if (Schema::hasColumn('matriculas', 'estado')) {
-                $query->whereRaw('LOWER(estado) = ?', ['matriculado']);
-            }
-        });
-
-        $cursosProgramados = $safeCount('horarios', function ($query) use ($periodoActivo) {
-            if ($periodoActivo && Schema::hasColumn('horarios', 'id_periodo')) {
-                $query->where('id_periodo', $periodoActivo->id);
-            }
-
-            if (Schema::hasColumn('horarios', 'id_curso')) {
-                $query->distinct('id_curso');
-            }
-        });
-
-        if (Schema::hasTable('horarios') && Schema::hasColumn('horarios', 'id_curso')) {
-            $horariosQuery = DB::table('horarios');
-            if ($periodoActivo && Schema::hasColumn('horarios', 'id_periodo')) {
-                $horariosQuery->where('id_periodo', $periodoActivo->id);
-            }
-            $cursosProgramados = $horariosQuery->distinct()->count('id_curso');
-        }
-
-        $pagosRegistrados = $safeCount('pagos_postulantes', function ($query) {
-            if (Schema::hasColumn('pagos_postulantes', 'estado')) {
-                $query->whereIn(DB::raw('LOWER(estado)'), ['aceptado', 'pagado', 'aprobado']);
-            }
-        });
-
-        $docentes = $safeCount('docentes', function ($query) {
-            if (Schema::hasColumn('docentes', 'activo')) {
-                $query->where('activo', 1);
-            }
-        });
-
-        $matriculasPorEstado = collect();
-        if (Schema::hasTable('matriculas') && Schema::hasColumn('matriculas', 'estado')) {
-            $query = DB::table('matriculas')
-                ->select('estado', DB::raw('COUNT(*) as total'));
-
-            if ($periodoActivo && Schema::hasColumn('matriculas', 'periodo_id')) {
-                $query->where('periodo_id', $periodoActivo->id);
-            }
-
-            $matriculasPorEstado = $query
-                ->groupBy('estado')
-                ->orderByDesc('total')
-                ->get()
-                ->map(fn ($item) => [
-                    'label' => ucfirst($item->estado ?: 'Sin estado'),
-                    'value' => (int) $item->total,
-                ]);
-        }
-
-        $postulantesPorMes = collect();
-        if (
-            Schema::hasTable('postulantes')
-            && Schema::hasColumn('postulantes', 'created_at')
-        ) {
-            $desde = Carbon::now()->startOfMonth()->subMonths(5);
-
-            $datosMensuales = DB::table('postulantes')
-                ->where('created_at', '>=', $desde)
-                ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as mes, COUNT(*) as total")
-                ->groupBy('mes')
-                ->pluck('total', 'mes');
-
-            $postulantesPorMes = collect(range(0, 5))->map(function ($offset) use ($desde, $datosMensuales) {
-                $fecha = $desde->copy()->addMonths($offset);
-                $clave = $fecha->format('Y-m');
-
-                return [
-                    'label' => ucfirst($fecha->locale('es')->translatedFormat('M')),
-                    'value' => (int) ($datosMensuales[$clave] ?? 0),
-                ];
-            });
-        }
-
-        $ultimosPostulantes = collect();
-        if (Schema::hasTable('postulantes')) {
-            $nombreColumnas = collect(['nombres', 'nombre', 'nombre_completo'])
-                ->first(fn ($column) => Schema::hasColumn('postulantes', $column));
-            $fechaColumna = Schema::hasColumn('postulantes', 'created_at') ? 'created_at' : null;
-            $estadoColumna = Schema::hasColumn('postulantes', 'estado') ? 'estado' : null;
-
-            if ($nombreColumnas) {
-                $query = DB::table('postulantes')->select($nombreColumnas);
-                if ($fechaColumna) {
-                    $query->addSelect($fechaColumna)->orderByDesc($fechaColumna);
+        // A. Indicador 1: Admisión vs Matrículas por Programa de Estudio
+        $dataAdmisionMatricula = DB::table('planes_estudio as pe')
+            ->leftJoin('inscripcion as i', 'i.id_plan', '=', 'pe.id')
+            ->leftJoin('matriculas as m', function ($join) use ($periodoActivo) {
+                $join->on('m.postulante_id', '=', 'i.id_postulante')
+                    ->on('m.plan_estudio_id', '=', 'pe.id')
+                    ->where('m.estado', '=', 'Matriculado');
+                if ($periodoActivo) {
+                    $join->where('m.periodo_id', '=', $periodoActivo->id);
                 }
-                if ($estadoColumna) {
-                    $query->addSelect($estadoColumna);
-                }
+            })
+            ->select(
+                'pe.nombre as carrera',
+                DB::raw('COUNT(DISTINCT i.id_postulante) as postulantes'),
+                DB::raw("COUNT(DISTINCT CASE WHEN i.estado IN ('aceptado', 'matriculado') THEN i.id_postulante END) as ingresantes"),
+                DB::raw('COUNT(DISTINCT m.id) as matriculados')
+            )
+            ->groupBy('pe.id', 'pe.nombre')
+            ->limit(5)
+            ->get();
 
-                $ultimosPostulantes = $query->limit(5)->get()->map(function ($item) use ($nombreColumnas, $fechaColumna, $estadoColumna) {
-                    return [
-                        'name' => $item->{$nombreColumnas},
-                        'status' => $estadoColumna ? ucfirst($item->{$estadoColumna} ?: 'Registrado') : 'Registrado',
-                        'date' => $fechaColumna && $item->{$fechaColumna}
-                            ? Carbon::parse($item->{$fechaColumna})->diffForHumans()
-                            : 'Sin fecha',
-                    ];
-                });
-            }
-        }
+        // B. Indicador 2: Egresados vs Titulados por Periodos Lectivos
+        $dataEgresadosTitulados = DB::table('periodos as per')
+            ->leftJoin('titulaciones as t', 't.created_at', '>=', DB::raw('per.fecha_inicio'))
+            ->select(
+                'per.nombre as periodo',
+                DB::raw("COUNT(DISTINCT t.id) as expedientes"),
+                DB::raw("COUNT(DISTINCT CASE WHEN t.estado = 'Titulado' THEN t.id END) as titulados")
+            )
+            ->groupBy('per.id', 'per.nombre')
+            ->orderByDesc('per.id')
+            ->limit(5)
+            ->get()
+            ->reverse()
+            ->values();
+
+        // C. Indicador 3: Repitencia y Alumnos en Riesgo por Curso
+        $dataRepitenciaCursos = DB::table('cursos as c')
+            ->leftJoin('repitencias as r', function ($join) use ($periodoActivo) {
+                $join->on('r.curso_id', '=', 'c.id');
+                if ($periodoActivo) {
+                    $join->where('r.periodo_id', '=', $periodoActivo->id);
+                }
+            })
+            ->leftJoin('nota_final as nf', function ($join) use ($periodoActivo) {
+                $join->on('nf.curso_id', '=', 'c.id');
+                if ($periodoActivo) {
+                    $join->where('nf.id_periodo', '=', $periodoActivo->id);
+                }
+            })
+            ->select(
+                'c.nombre as curso',
+                DB::raw("COUNT(DISTINCT r.id_reptencia) + COUNT(DISTINCT CASE WHEN nf.promedio < 13 THEN nf.id END) as desaprobados")
+            )
+            ->groupBy('c.id', 'c.nombre')
+            ->having('desaprobados', '>', 0)
+            ->orderByDesc('desaprobados')
+            ->limit(5)
+            ->get();
+
+        // D. Indicador 4: Distribución de Convalidaciones por Estado
+        $dataConvalidaciones = DB::table('convalidaciones')
+            ->select(
+                DB::raw("estado as tipo"),
+                DB::raw("COUNT(*) as total")
+            )
+            ->groupBy('estado')
+            ->get();
+
+        // E. Indicador 5: Horarios / Carga Horaria por Docente
+        $dataCargaDocente = DB::table('docentes as d')
+            ->join('horarios as h', 'h.id_docente', '=', 'd.id')
+            ->when($periodoActivo, fn($q) => $q->where('h.id_periodo', $periodoActivo->id))
+            ->select(
+                DB::raw("CONCAT(d.nombre, ' ', SUBSTRING(d.apellido, 1, 1), '.') as docente"),
+                DB::raw("COUNT(h.id) * 2 as horas_lectivas")
+            )
+            ->groupBy('d.id', 'd.nombre', 'd.apellido')
+            ->limit(6)
+            ->get();
 
         return Inertia::render('Dashboard/AdminDashboard', [
-            'dashboardType' => 'administrativo',
-            'periodo' => $periodoActivo->nombre ?? 'Sin periodo activo',
-            'lastUpdated' => Carbon::now()->format('d/m/Y H:i'),
-            'summary' => [
-                'usuarios_activos' => $usuariosActivos,
-                'postulantes' => $totalPostulantes,
-                'matriculados' => $matriculados,
-                'cursos_programados' => $cursosProgramados,
-                'pagos_registrados' => $pagosRegistrados,
-                'docentes' => $docentes,
+            'dashboardType'         => 'administrativo',
+            'periodo'               => $periodoActivo->nombre ?? 'Sin periodo activo',
+            'lastUpdated'           => Carbon::now()->format('d/m/Y H:i'),
+            'summary'               => [
+                'usuarios_activos'   => $usuariosActivos,
+                'postulantes'        => $totalPostulantes,
+                'matriculados'       => $matriculadosCount,
+                'docentes'           => $docentesCount,
+                'convalidados'       => $convalidadosCount,
+                'titulados'          => $tituladosCount,
             ],
-            'matriculasByStatus' => $matriculasPorEstado,
-            'applicantsByMonth' => $postulantesPorMes,
-            'recentApplicants' => $ultimosPostulantes,
+            'dataAdmisionMatricula' => $dataAdmisionMatricula,
+            'dataEgresadosTitulados'=> $dataEgresadosTitulados,
+            'dataRepitenciaCursos'  => $dataRepitenciaCursos,
+            'dataConvalidaciones'   => $dataConvalidaciones,
+            'dataCargaDocente'      => $dataCargaDocente,
         ]);
     }
 }

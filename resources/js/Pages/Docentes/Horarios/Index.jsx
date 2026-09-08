@@ -5,17 +5,14 @@ import { useMemo } from 'react';
 export default function Index({ horarios = [] }) {
     const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-    // Normalizar horas a formato HH:MM
     const formatTime = (timeStr) => timeStr?.substring(0, 5) || '';
 
-    // Convertir HH:MM a minutos para ordenamiento numérico
     const toMinutes = (timeStr) => {
         if (!timeStr) return 0;
         const [h, m] = timeStr.split(':').map(Number);
         return h * 60 + m;
     };
 
-    // Extraer únicamente los rangos de horas reales donde el docente TIENE clase y ordenarlos
     const rangosHorarios = useMemo(() => {
         const rangosMap = new Map();
 
@@ -34,7 +31,6 @@ export default function Index({ horarios = [] }) {
         return Array.from(rangosMap.values()).sort((a, b) => a.inicioMin - b.inicioMin);
     }, [horarios]);
 
-    // Buscar si existe una clase asignada para un día y rango horario específico
     const getClaseEnRango = (dia, rangoLabel) => {
         return horarios.find((h) => {
             const coincideDia =
@@ -49,23 +45,33 @@ export default function Index({ horarios = [] }) {
     return (
         <AuthenticatedLayout
             header={
-                <div>
-                    <p className="text-sm font-semibold text-[#315d7a]">
-                        Mi actividad académica
-                    </p>
-                    <h1 className="mt-0.5 text-2xl font-bold text-slate-900">
-                        Mi horario académico
-                    </h1>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                        Matriz semanal de clases, secciones y aulas asignadas para el ciclo activo.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <p className="text-sm font-semibold text-[#315d7a]">
+                            Mi actividad académica
+                        </p>
+                        <h1 className="mt-0.5 text-2xl font-bold text-slate-900">
+                            Mi horario académico
+                        </h1>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            Matriz semanal de clases, secciones y aulas asignadas para el ciclo activo.
+                        </p>
+                    </div>
+
+                    <a
+                        href={route('docente.horarios.pdf')}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#315d7a] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#274c64] shadow-xs self-start"
+                    >
+                        🖨️ Imprimir Horario (PDF)
+                    </a>
                 </div>
             }
         >
             <Head title="Mi horario académico" />
 
             <div className="space-y-6">
-                {/* Tabla Matriz de Horarios */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse text-left text-xs">
@@ -97,14 +103,12 @@ export default function Index({ horarios = [] }) {
                                 ) : (
                                     rangosHorarios.map((rango) => (
                                         <tr key={rango.label} className="divide-x divide-slate-200 hover:bg-slate-50/30">
-                                            {/* Columna Lateral de Hora */}
                                             <td className="bg-slate-50/70 px-3 py-4 text-center font-bold text-slate-700 align-middle">
                                                 <span className="inline-block rounded-md bg-white border border-slate-200 px-2.5 py-1 font-mono text-[11px] text-[#315d7a] shadow-2xs font-extrabold">
                                                     ⏰ {rango.label}
                                                 </span>
                                             </td>
 
-                                            {/* Columnas de los Días de la Semana */}
                                             {diasSemana.map((dia) => {
                                                 const clase = getClaseEnRango(dia, rango.label);
 
